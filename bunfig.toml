@@ -1,0 +1,6 @@
+[install]
+peer = false
+
+[test]
+isolate = true
+pathIgnorePatterns = ["vendor/**", "node_modules/**", ".tmp/**"]

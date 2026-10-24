@@ -1,0 +1,11 @@
+{
+  "name": "lumiverse-android-browser-diagnostics",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun check-android-downloads.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.61.0"
+  }
+}

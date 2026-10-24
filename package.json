@@ -1,0 +1,43 @@
+{
+  "name": "lumiverse-android-app",
+  "version": "0.3.5",
+  "private": true,
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "packageManager": "bun@1.4.2",
+  "engines": {
+    "bun": ">=1.4.2"
+  },
+  "scripts": {
+    "build:android-prototype": "bun run scripts/build-android-prototype.ts",
+    "build:android-native": "bun run build:lancedb:android-native && bun run build:sharp:android-native && bun run build:ffmpeg:android-native && bun run build:git:android-native",
+    "build:git:android-native": "bun run scripts/build-git-android-native.ts",
+    "build:ffmpeg:android-native": "bun run scripts/build-ffmpeg-android-native.ts",
+    "build:android-tauri": "bun run scripts/build-android-tauri.ts",
+    "build:lancedb:android-native": "bun run scripts/build-lancedb-android-native.ts",
+    "build:sharp:android-native": "bun run scripts/build-sharp-android-native.ts",
+    "test:android-prototype": "bun run scripts/smoke-test-android-prototype.ts",
+    "build:lancedb:android": "bash scripts/build-lancedb-android.sh",
+    "build": "bun run build:android-tauri",
+    "test": "bun run test:unit",
+    "test:backend": "bun run scripts/test-android-setup.ts",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "bun test --isolate scripts android/notification-policy.test.ts android/server-address.test.ts",
+    "test:ci": "bun run typecheck && bun run test:unit && bun run test:backend"
+  },
+  "dependencies": {
+    "fflate": "0.8.2",
+    "sharp": "0.34.5"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "@types/jsdom": "28.0.1",
+    "bun-types": "1.4.2",
+    "jsdom": "29.0.1",
+    "typescript": "7.0.2",
+    "esbuild": "0.27.0"
+  },
+  "trustedDependencies": [
+    "sharp"
+  ]
+}
