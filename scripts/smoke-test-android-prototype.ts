@@ -107,12 +107,19 @@ async function start() {
     const deadline = Date.now() + 15000
     while (Date.now() < deadline) {
       try {
-        if (await evaluate("!!document.getElementById('connection-form')")) {
-          await evaluate("document.getElementById('local').click(); true")
-        }
-        break
+        const ready = await evaluate<boolean>(`(() => {
+          const local = document.getElementById('local');
+          if (local && window.__TAURI_INTERNALS__) {
+            if (!local.disabled) local.click();
+            return true;
+          }
+          return location.hostname === '127.0.0.1' && document.readyState !== 'loading';
+        })()`)
+        if (ready) return
       } catch { await Bun.sleep(250) }
+      await Bun.sleep(250)
     }
+    throw new Error("The connection page or local runtime did not become ready")
   }
 }
 await command("shell", "am", "force-stop", app);

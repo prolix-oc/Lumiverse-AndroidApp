@@ -81,12 +81,16 @@ class MainActivity : TauriActivity() {
     ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
       val types = WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
       val bars = insets.getInsets(types)
-      view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-      // The native container already clears the bars. Notify the WebView with
-      // zero safe areas so CSS cannot add them again; keep IME updates flowing.
+      val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+      // Edge-to-edge windows must reserve IME space themselves. Resize the
+      // WebView instead of letting focus pan the entire document offscreen.
+      view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom))
+      // These insets are already reflected in the WebView's bounds. Passing
+      // them through would make WebView/CSS subtract the same space again.
       WindowInsetsCompat.Builder(insets)
         .setInsets(types, Insets.NONE)
         .setInsetsIgnoringVisibility(types, Insets.NONE)
+        .setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE)
         .setDisplayCutout(null)
         .build()
     }

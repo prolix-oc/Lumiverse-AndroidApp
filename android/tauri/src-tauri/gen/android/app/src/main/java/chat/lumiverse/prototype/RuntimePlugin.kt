@@ -29,6 +29,7 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
     private var runtime: RuntimeHost? = null
     private var webView: WebView? = null
     private var downloads: NativeDownloads? = null
+    private var browserWindows: NativeBrowserWindows? = null
     private var launcherUrl = "http://tauri.localhost/index.html"
     private var entryHistoryIndex = 0
     private var localAttempt = 0
@@ -44,6 +45,7 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
         webView.settings.allowFileAccess = false
         webView.settings.allowContentAccess = false
         CookieManager.getInstance().setAcceptCookie(true)
+        browserWindows = NativeBrowserWindows(activity, webView)
         installControls(webView)
         downloads = NativeDownloads(activity, webView)
         (activity as? MainActivity)?.let {
@@ -191,6 +193,7 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
     override fun onDestroy(activity: AppCompatActivity) {
         handler.removeCallbacksAndMessages(null)
         controls?.dismiss()
+        browserWindows?.destroy(); browserWindows = null
         downloads?.destroy(); downloads = null
         stopLocal()
         (activity as? MainActivity)?.let { it.notificationBridge?.destroy(); it.notificationBridge = null; it.notificationNavigation = null }

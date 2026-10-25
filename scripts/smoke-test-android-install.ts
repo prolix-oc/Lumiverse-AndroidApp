@@ -5,6 +5,7 @@ import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node
 import { join, resolve } from "node:path";
 import { androidNdkLlvm } from "./android-native";
 import { buildAndroidBunCompat } from "./build-bun-android-compat";
+import { ANDROID_BUN } from "./android-bun";
 
 const root = resolve(import.meta.dir, "..");
 const args = process.argv.slice(2);
@@ -29,6 +30,8 @@ try {
   const installed = (await run(device("shell", "pm", "path", "chat.lumiverse.prototype"))).stdout.trim().replace(/^package:/, "");
   assert.ok(installed.endsWith("/base.apk"));
   const bun = installed.replace(/base\.apk$/, "lib/arm64/libbun.so");
+  const bunVersion = (await run(device("shell", bun, "--version"))).stdout.trim();
+  assert.equal(bunVersion, ANDROID_BUN.version, "Exercise the pinned Android Bun runtime");
   const installedCompat = installed.replace(/base\.apk$/, `lib/arm64/${compat.library}`);
   const deviceHash = (await run(device("shell", "sha256sum", installedCompat))).stdout.split(/\s+/)[0];
   assert.equal(deviceHash, compat.sha256, "Exercise the compatibility library actually shipped in the installed APK");
@@ -61,7 +64,7 @@ try {
     const result = await run(device(...prefix, preload, `${remote}/install-seccomp`, mode), true);
     assert.equal(result.code, 159, `Compatibility must preserve fatal SIGSYS for ${mode}`);
   }
-  const report = { testedAt: new Date().toISOString(), serial, bun: "1.4.2", trappedSyscalls: ["openat2", "fchmodat2"],
+  const report = { testedAt: new Date().toISOString(), serial, bun: bunVersion, trappedSyscalls: ["openat2", "fchmodat2"],
     baselineExitCode: baseline.code, compatibilityExitCode: recovered.code, binExecutable: true, escapingBinRejected: true,
     signalForwarding: probe.stdout.trim(), otherSigsysRemainFatal: true, compatibilitySource: "installed-apk", compatibilitySha256: compat.sha256 };
   const reportIndex = args.indexOf("--report");

@@ -35,8 +35,10 @@ public final class MainActivity extends Activity {
             if (Build.VERSION.SDK_INT >= 30) {
                 int types = WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout();
                 Insets bars = insets.getInsets(types);
-                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                Insets ime = insets.getInsets(WindowInsets.Type.ime());
+                view.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
                 remaining.setInsets(types, Insets.NONE).setInsetsIgnoringVisibility(types, Insets.NONE);
+                remaining.setInsets(WindowInsets.Type.ime(), Insets.NONE);
             } else {
                 view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
                     insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
