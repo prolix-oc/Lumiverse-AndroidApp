@@ -14,6 +14,19 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// CI nightlies need increasing install versions even when the app's base
+// version is unchanged. Local builds retain Tauri's versioning.
+val nightlyVersionCode = System.getenv("LUMIVERSE_ANDROID_VERSION_CODE")?.let {
+    it.toIntOrNull()?.takeIf { code -> code in 1..2100000000 }
+        ?: error("LUMIVERSE_ANDROID_VERSION_CODE must be between 1 and 2100000000")
+}
+val nightlyVersionName = System.getenv("LUMIVERSE_ANDROID_VERSION_NAME")?.also {
+    require(it.matches(Regex("[A-Za-z0-9.+-]{1,128}"))) { "Invalid LUMIVERSE_ANDROID_VERSION_NAME" }
+}
+require((nightlyVersionCode == null) == (nightlyVersionName == null)) {
+    "Set both Android nightly version variables together"
+}
+
 // Optional client configuration. Provider/service-account keys never enter the APK.
 val firebaseConfig = System.getenv("LUMIVERSE_ANDROID_FIREBASE_CONFIG")?.let { path ->
     JsonSlurper().parse(file(path)) as Map<*, *>
@@ -28,8 +41,8 @@ android {
         applicationId = "chat.lumiverse.prototype"
         minSdk = 29
         targetSdk = 36
-        versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
-        versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+        versionCode = nightlyVersionCode ?: tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
+        versionName = nightlyVersionName ?: tauriProperties.getProperty("tauri.android.versionName", "1.0")
         firebaseConfig?.let { config ->
             val project = config["project_info"] as Map<*, *>
             val client = (config["client"] as List<*>).map { it as Map<*, *> }.firstOrNull {

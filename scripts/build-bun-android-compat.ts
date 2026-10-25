@@ -2,6 +2,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { androidNdkLlvm, nativeSha256, readAndroidElf } from "./android-native";
+import { ANDROID_BUN } from "./android-bun";
 
 export async function buildAndroidBunCompat(out = resolve(import.meta.dir, "../dist/native/android-arm64")) {
   const root = resolve(import.meta.dir, "..");
@@ -15,7 +16,7 @@ export async function buildAndroidBunCompat(out = resolve(import.meta.dir, "../d
   if (await child.exited !== 0) throw new Error("Android Bun install compatibility build failed");
   const bytes = readFileSync(join(out, name));
   readAndroidElf(bytes);
-  const manifest = { format: 1, target: "aarch64-linux-android", bunVersion: "1.4.2", library: name,
+  const manifest = { format: 1, target: "aarch64-linux-android", bunVersion: ANDROID_BUN.version, library: name,
     sha256: nativeSha256(bytes), sourceSha256: nativeSha256(readFileSync(source)) };
   await Bun.write(join(out, "bun-install-compat.json"), JSON.stringify(manifest, null, 2) + "\n");
   return { ...manifest, bytes };
