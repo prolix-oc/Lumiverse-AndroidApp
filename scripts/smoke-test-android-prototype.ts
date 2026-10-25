@@ -214,6 +214,8 @@ if (args.includes("--attempt-backend")) {
         await Bun.sleep(1000);
       }
       assert.ok(rendered, "Production frontend must render inside Tauri automatically");
+      assert.equal(await evaluate("!!window.lumiverseDownloads && !!window.lumiverseNativeDownloads && !!window.lumiverseNotifications", false), true,
+        "The actual backend origin must receive native bridges after leaving the setup server");
       assert.equal(await evaluate("window.__LUMIVERSE_MOBILE__ === true && document.documentElement.getAttribute('data-platform') === 'android' && !document.documentElement.hasAttribute('data-tauri-desktop')", false), true);
       assert.deepEqual(await evaluate("window.__TAURI_INTERNALS__.invoke('mobile_host_info')", false), tauri);
       const entry = await evaluate("document.querySelector('input[name=password]')?'login':'lumiverse'");
@@ -277,6 +279,8 @@ if (args.includes("--attempt-backend")) {
     assert.equal(relaunched.configured, true);
     assert.equal(relaunched.backendState, "running", "Configured installs must start the backend automatically");
     assert.equal(await evaluate(`location.origin===${JSON.stringify(new URL(relaunched.backendUrl).origin)} && !document.getElementById('checks') && !document.getElementById('setup')`), true);
+    if (args.includes("--require-tauri")) assert.equal(await evaluate("!!window.lumiverseNativeDownloads && !!window.lumiverseNotifications"), true,
+      "Native bridges must follow the backend's new port after a restart");
     backendAttempt.automaticRelaunch = true;
   }
 }

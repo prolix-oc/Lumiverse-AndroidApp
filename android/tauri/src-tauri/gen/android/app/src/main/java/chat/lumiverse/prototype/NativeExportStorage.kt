@@ -39,8 +39,11 @@ class NativeExportStorage(private val activity: Activity) {
         check(preferences.edit().putStringSet("pending", values).commit()) { "Could not record the pending export." }
     }
 
-    fun create(filename: String, mimeType: String): Target {
+    fun create(filename: String, requestedMimeType: String): Target {
         check(!destroyed) { "The app is closing." }
+        // Android's providers append .zip to an unrecognized .charx extension
+        // when the server sends application/zip. Preserve the portable filename.
+        val mimeType = if (filename.endsWith(".charx", ignoreCase = true)) "application/octet-stream" else requestedMimeType
         val failure: Exception
         val saved = preferences.getString("folder", null)?.let(Uri::parse)
         if (saved != null) {

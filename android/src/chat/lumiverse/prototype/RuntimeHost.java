@@ -16,7 +16,11 @@ import java.util.zip.ZipInputStream;
 
 /** Shared launcher for the Java diagnostic host and the Tauri mobile plugin. */
 public final class RuntimeHost {
-    public interface Listener { void ready(String url); void failed(String message); }
+    public interface Listener {
+        void ready(String url);
+        default void backendReady(String url) { ready(url); }
+        void failed(String message);
+    }
     private final Context context;
     private final String host;
     private final Listener listener;
@@ -165,6 +169,13 @@ public final class RuntimeHost {
                                 Files.write(debugAddress.toPath(), url.getBytes(java.nio.charset.StandardCharsets.UTF_8));
                             listener.ready(url);
                         }
+                    } else if (line.startsWith("LUMIVERSE_ANDROID_BACKEND_READY ")) {
+                        String url = line.substring("LUMIVERSE_ANDROID_BACKEND_READY ".length());
+                        Uri uri = Uri.parse(url);
+                        if (!"http".equals(uri.getScheme()) || !"127.0.0.1".equals(uri.getHost()) || uri.getPort() <= 0
+                            || uri.getPort() > 65535 || !url.equals("http://127.0.0.1:" + uri.getPort() + "/"))
+                            throw new IOException("Invalid local backend address");
+                        if (!destroyed) listener.backendReady(url);
                     } else {
                         synchronized (output) {
                             output.append(line).append('\n');

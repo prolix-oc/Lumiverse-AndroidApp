@@ -43,7 +43,7 @@ const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: request => {
   if (path === '/archive' || path === '/attachment') {
     if (!request.headers.get('Cookie')?.includes('export-smoke=1')) return new Response('Missing cookie', { status: 401 })
     authenticated++
-    return new Response(bytes, { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${prefix}-attachment.charx"` } })
+    return new Response(bytes, { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${prefix}-attachment.charx"` } })
   }
   return new Response(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Android export smoke</title><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script src="/fixture.js"></script></body></html>`,
     { headers: { 'Content-Type': 'text/html', 'Set-Cookie': 'export-smoke=1; Path=/; SameSite=Lax', 'Cache-Control': 'no-store', 'Content-Security-Policy': 'connect-src data:' } })

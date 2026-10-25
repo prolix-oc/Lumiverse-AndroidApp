@@ -135,6 +135,9 @@ async function launchBackend(input: Record<string, unknown>) {
       if (message?.type === "bundle-ready" && message.token === readyToken) {
         backendState = "running";
         backendUrl = `http://127.0.0.1:${port}/`;
+        // The native host must select this origin before loading the backend.
+        // The setup server and backend deliberately use different loopback ports.
+        console.log(`LUMIVERSE_ANDROID_BACKEND_READY ${backendUrl}`);
       }
     },
     onExit(_child, code) { backendState = `exited (${code})`; backendUrl = ""; backendError = "Please try again. Your local data is saved."; },

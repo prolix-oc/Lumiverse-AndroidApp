@@ -56,8 +56,8 @@ class NativeDownloads(private val activity: Activity, private val view: WebView)
             }
         }
         view.setDownloadListener { url, userAgent, disposition, mimeType, _ ->
-            val origin = selected
-            if (origin != null && NativeNotifications.origin(view.url) == origin && NativeNotifications.origin(url) == origin) {
+            val origin = DownloadPolicy.trustedOrigin(selected, view.url)
+            if (origin != null && DownloadPolicy.allowsRedirect(origin, url)) {
                 startUrl(url, URLUtil.guessFileName(url, disposition, mimeType), userAgent, origin)
             } else show("Export failed. This download is not from the selected server.")
         }
@@ -83,8 +83,9 @@ class NativeDownloads(private val activity: Activity, private val view: WebView)
         worker.execute { transfers.keys.toList().forEach { discard(it) } }
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return
         WebViewCompat.removeWebMessageListener(view, "lumiverseDownloads")
-        WebViewCompat.addWebMessageListener(view, "lumiverseDownloads", setOf(origin)) { _, message, source, mainFrame, proxy ->
-            if (!mainFrame || NativeNotifications.origin(source.toString()) != selected || NativeNotifications.origin(view.url) != selected) return@addWebMessageListener
+        WebViewCompat.addWebMessageListener(view, "lumiverseDownloads", DownloadPolicy.trustedOrigins(origin)) { _, message, source, mainFrame, proxy ->
+            val sourceOrigin = DownloadPolicy.trustedOrigin(selected, source.toString())
+            if (!mainFrame || sourceOrigin == null || NativeNotifications.origin(view.url) != sourceOrigin) return@addWebMessageListener
             val epoch = generation
             try {
                 val raw = message.data ?: return@addWebMessageListener
@@ -95,15 +96,15 @@ class NativeDownloads(private val activity: Activity, private val view: WebView)
                 val payload = request.optJSONObject("payload") ?: JSONObject()
                 fun reply(result: Any?, error: String? = null) {
                     activity.runOnUiThread {
-                        if (!destroyed && epoch == generation && NativeNotifications.origin(view.url) == origin)
+                        if (!destroyed && epoch == generation && NativeNotifications.origin(view.url) == sourceOrigin)
                             proxy.postMessage(JSONObject().put("id", id).put("result", result ?: JSONObject.NULL).put("error", error ?: JSONObject.NULL).toString())
                     }
                 }
                 if (request.optString("action") == "url") {
                     try {
                         val target = payload.getString("url")
-                        require(NativeNotifications.origin(target) == origin) { "Download must be from the selected server." }
-                        startUrl(target, payload.optString("filename"), view.settings.userAgentString, origin) { error -> reply(error == null, error) }
+                        require(NativeNotifications.origin(target) == sourceOrigin) { "Download must be from the selected server." }
+                        startUrl(target, payload.optString("filename"), view.settings.userAgentString, sourceOrigin) { error -> reply(error == null, error) }
                     } catch (error: Exception) { reply(null, error.message ?: "Could not download the export.") }
                 } else worker.execute {
                     if (destroyed || epoch != generation) return@execute
@@ -177,16 +178,18 @@ class NativeDownloads(private val activity: Activity, private val view: WebView)
 
     private fun startUrl(url: String, filename: String, userAgent: String, origin: String, completion: ((String?) -> Unit)? = null) {
         val epoch = generation
-        val cookies = CookieManager.getInstance().getCookie(url)
         show("Saving export…")
         network.execute {
             var item: Transfer? = null
             var stage = "download the export"
             try {
                 var target = url
+                var previousOrigin = origin
                 for (redirect in 0..5) {
                     check(!destroyed && epoch == generation) { "Connection changed." }
-                    require(NativeNotifications.origin(target) == origin) { "Download redirected outside the selected server." }
+                    require(DownloadPolicy.allowsRedirect(previousOrigin, target)) { "Download redirected outside the selected server." }
+                    previousOrigin = NativeNotifications.origin(target)!!
+                    val cookies = CookieManager.getInstance().getCookie(target)
                     val request = Request.Builder().url(target).header("User-Agent", userAgent).apply {
                         if (!cookies.isNullOrBlank()) header("Cookie", cookies)
                     }.build()

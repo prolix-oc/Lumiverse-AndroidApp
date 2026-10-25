@@ -112,6 +112,14 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
                 if (attempt != localAttempt) return@runOnUiThread
                 preferences.edit().putString("mode", "local").apply()
                 pendingLocal?.resolve(); pendingLocal = null
+                // This is the setup server, not the authenticated backend.
+                // Preserve pending notification taps until backendReady selects it.
+                val view = webView ?: return@runOnUiThread
+                entryHistoryIndex = view.copyBackForwardList().currentIndex + 1
+                view.loadUrl(url)
+            } }
+            override fun backendReady(url: String) { activity.runOnUiThread {
+                if (attempt != localAttempt) return@runOnUiThread
                 navigate(url)
             } }
             override fun failed(message: String) { activity.runOnUiThread {

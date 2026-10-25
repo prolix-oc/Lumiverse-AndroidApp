@@ -94,10 +94,19 @@ try {
   await chooser()
   await connect('https://example.com')
   await wait("location.protocol === 'https:' && document.title === 'Example Domain'", 45000)
+  assert.equal(await evaluate("!!window.lumiverseNativeDownloads"), true)
+  await chooser()
+  await connect('http://example.com')
+  await wait("location.hostname === 'example.com' && document.readyState === 'complete'", 45000)
+  // Exercise the origin transition even when the example server serves HTTP
+  // directly instead of returning an upgrade redirect.
+  await evaluate("location.replace('https://example.com'); true")
+  await wait("location.protocol === 'https:' && document.title === 'Example Domain'", 45000)
+  assert.equal(await evaluate("!!window.lumiverseNativeDownloads"), true, 'A standard HTTP to HTTPS upgrade must preserve the download bridge')
   await chooser()
   await evaluate("document.getElementById('local').click(); true")
   await wait("location.hostname === '127.0.0.1' && !document.getElementById('connection-form')", 90000)
-  console.log(JSON.stringify({ http: 'passed', https: 'passed', cookies: 'passed', savedConnection: 'passed', nativeRecovery: 'passed', remoteIpcDenied: 'passed', noRemoteBackendProcess: 'passed', localHosting: 'passed', audioWithoutSilentPrimer: 'passed' }, null, 2))
+  console.log(JSON.stringify({ http: 'passed', https: 'passed', httpsUpgradeDownloads: 'passed', cookies: 'passed', savedConnection: 'passed', nativeRecovery: 'passed', remoteIpcDenied: 'passed', noRemoteBackendProcess: 'passed', localHosting: 'passed', audioWithoutSilentPrimer: 'passed' }, null, 2))
 } finally {
   server.stop(true)
   await command('reverse', '--remove', `tcp:${port}`)
