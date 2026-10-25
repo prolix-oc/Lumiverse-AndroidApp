@@ -6,7 +6,7 @@ remote Lumiverse server. Native sources keep their `android/` layout.
 
 ## Setup and build
 
-Use Bun 1.4.2, Node.js, Rust/rustup, Android Studio's JDK, Android SDK platform 36
+Use Bun 1.4.4, Node.js, Rust/rustup, Android Studio's JDK, Android SDK platform 36
 or newer, build tools, and NDK r28c. Native LanceDB builds use Rust 1.97.0.
 Configure `ANDROID_HOME`, `JAVA_HOME`, and `ANDROID_NDK_HOME`/`NDK_HOME` when they
 are installed outside the build scripts' defaults.
@@ -76,3 +76,20 @@ missing checkouts and revision mismatches fail the integration job. CI does not
 skip tests when required shared source is missing. Only the integration job
 needs backend dependencies; native app builds and device smoke tests remain
 separate from these source-level CI checks.
+
+## Nightly APKs
+
+[Public Android prereleases](https://github.com/prolix-oc/Lumiverse-AndroidApp/releases)
+are built daily at 06:53 UTC by the private Lumiverse-Builds controller on the
+physical Linux runner. Each build uses the latest Android `main` and backend
+`staging` commits, installs their locked dependencies, runs app and backend
+integration checks, and rebuilds the production frontend and complete ARM64 APK.
+The release records both immutable source revisions, the APK checksum and build
+provenance. Ordinary CI continues to use `backend-source.json`.
+
+Nightlies use the existing development signing certificate and increasing
+Android version codes, so they can update an installed development APK without
+resetting app data. CI sets `LUMIVERSE_ANDROID_VERSION_CODE` and
+`LUMIVERSE_ANDROID_VERSION_NAME` together; local builds retain Tauri versioning.
+The private controller owns the schedule, SDK/NDK/Java/Rust container, caches and
+release credentials. No public pull-request workflow uses the private runner.

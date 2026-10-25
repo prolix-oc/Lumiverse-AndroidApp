@@ -51,7 +51,9 @@ const objectStoreOverride = `[patch.crates-io.object_store]\npath = ${JSON.strin
 writeFileSync(workspaceManifest, workspaceSource.includes("[patch.crates-io.object_store]")
   ? workspaceSource.replace(/\[patch\.crates-io\.object_store\]\s*\npath\s*=.*\n?/, objectStoreOverride)
   : workspaceSource + "\n" + objectStoreOverride);
-await run(["cargo", "+1.97.0", "update", "-p", "object_store", "--offline"], source);
+// A new CI runner has no Cargo registry yet. CARGO_NET_OFFLINE still supports
+// explicitly offline builds once the dependency cache has been populated.
+await run(["cargo", "+1.97.0", "update", "-p", "object_store"], source);
 const env = {
   ...process.env,
   CARGO_TARGET_DIR: join(cache, "lancedb-target"),

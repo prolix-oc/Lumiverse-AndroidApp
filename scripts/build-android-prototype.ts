@@ -7,13 +7,10 @@ import { collectBundleFiles } from "./collect-payload-files";
 import { backendRoot } from "./backend-project";
 import { androidSystemLibraries, nativeSha256, readAndroidElf, walkNativeNotices } from "./android-native";
 import { buildAndroidBunCompat } from "./build-bun-android-compat";
+import { ANDROID_BUN } from "./android-bun";
 
 const ROOT = resolve(import.meta.dir, "..");
-export const ANDROID_BUN = {
-  version: "1.4.2",
-  archive: "bun-linux-aarch64-android.zip",
-  sha256: "a1c7e2983f1bb65146beb256a4d72449f23042412bc2cf278aa6397ba27e0274",
-};
+export { ANDROID_BUN } from "./android-bun";
 
 /** Reject host or GNU Linux executables even when their CPU matches the APK. */
 export function verifyAndroidBun(archive: Uint8Array): Uint8Array {
@@ -39,7 +36,7 @@ async function build() {
   const args = process.argv.slice(2);
   let skipFrontend = false, offline = false, runtimeOnly = false, prepareOnly = false;
   let nativeDir = join(ROOT, "dist/native/android-arm64");
-  let bunZip = join(ROOT, ".tmp/android-prototype/bun-android.zip");
+  let bunZip = join(ROOT, `.tmp/android-prototype/bun-${ANDROID_BUN.version}-android.zip`);
   let sdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || join(process.env.HOME || "", "Library/Android/sdk");
   let javaHome = process.env.JAVA_HOME || "/Applications/Android Studio.app/Contents/jbr/Contents/Home";
   for (let i = 0; i < args.length; i++) {
