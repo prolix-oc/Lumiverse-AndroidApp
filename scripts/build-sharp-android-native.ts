@@ -72,6 +72,7 @@ await run(["tar", "-xf", webpArchive, "--strip-components=1", "-C", webpSource])
 await run(["cmake", "-S", webpSource, "-B", webpBuild, `-DCMAKE_TOOLCHAIN_FILE=${join(ndk, "build/cmake/android.toolchain.cmake")}`,
   "-DANDROID_ABI=arm64-v8a", "-DANDROID_PLATFORM=android-29", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
   "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_SHARED_LIBS=ON", "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384",
+  "-DCMAKE_BUILD_RPATH=$ORIGIN",
   ...["ANIM_UTILS", "CWEBP", "DWEBP", "GIF2WEBP", "IMG2WEBP", "VWEBP", "WEBPINFO", "WEBPMUX", "EXTRAS"].map(name => `-DWEBP_BUILD_${name}=OFF`),
   "-DWEBP_BUILD_LIBWEBPMUX=ON", "-DWEBP_ENABLE_SWAP_16BIT_CSP=ON"]);
 await run(["cmake", "--build", webpBuild, "--parallel", "4"]);
@@ -91,7 +92,7 @@ await run([join(llvm, "aarch64-linux-android29-clang++"), "-shared", "-fPIC", "-
   `-I${headers}`, `-I${addon}`, `-I${join(prefix, "include")}`, `-I${join(prefix, "include/glib-2.0")}`, `-I${join(prefix, "lib/glib-2.0/include")}`,
   ...["common", "metadata", "stats", "operations", "pipeline", "utilities", "sharp"].map(name => join(sharp, "src", `${name}.cc`)),
   `-L${join(prefix, "lib")}`, "-lvips-cpp", "-lvips", "-lgobject-2.0", "-lglib-2.0", "-lc++_shared",
-  "-Wl,-z,max-page-size=16384", "-Wl,-z,common-page-size=16384", "-Wl,-soname,libsharp.so", "-o", binary]);
+  "-Wl,-z,max-page-size=16384", "-Wl,-z,common-page-size=16384", "-Wl,-rpath,$ORIGIN", "-Wl,-soname,libsharp.so", "-o", binary]);
 await run([join(llvm, "llvm-strip"), "--strip-debug", binary]);
 copyFileSync(join(sharp, "LICENSE"), join(out, "Sharp.LICENSE"));
 const libraries = sharpAndroidLibraries(out, prefix);
