@@ -71,8 +71,7 @@ mkdirSync(webpSource, { recursive: true });
 await run(["tar", "-xf", webpArchive, "--strip-components=1", "-C", webpSource]);
 await run(["cmake", "-S", webpSource, "-B", webpBuild, `-DCMAKE_TOOLCHAIN_FILE=${join(ndk, "build/cmake/android.toolchain.cmake")}`,
   "-DANDROID_ABI=arm64-v8a", "-DANDROID_PLATFORM=android-29", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
-  "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_SHARED_LIBS=ON", "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384",
-  "-DCMAKE_BUILD_RPATH=$ORIGIN",
+  "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_SHARED_LIBS=ON", "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384 -Wl,-rpath,$ORIGIN",
   ...["ANIM_UTILS", "CWEBP", "DWEBP", "GIF2WEBP", "IMG2WEBP", "VWEBP", "WEBPINFO", "WEBPMUX", "EXTRAS"].map(name => `-DWEBP_BUILD_${name}=OFF`),
   "-DWEBP_BUILD_LIBWEBPMUX=ON", "-DWEBP_ENABLE_SWAP_16BIT_CSP=ON"]);
 await run(["cmake", "--build", webpBuild, "--parallel", "4"]);
