@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lumiverse</title>
   <link rel="stylesheet" href="connection.css">
+  <script src="connection-history.js" defer></script>
   <script src="connection.js" defer></script>
 </head>
 <body>
@@ -17,11 +18,17 @@
     <form id="connection-form">
       <label for="server">Server address</label>
       <input id="server" name="server" type="url" inputmode="url" placeholder="https://lumiverse.example.com" autocomplete="url" autocapitalize="none" spellcheck="false" required>
+      <details id="connection-history">
+        <summary>Connection history<span id="history-count"></span></summary>
+        <p class="history-hint">Most recent first. Select a server, then tap Connect.</p>
+        <p id="history-empty" class="history-hint">Your successful connections will appear here.</p>
+        <ul id="history-list" aria-label="Previously connected servers"></ul>
+      </details>
       <p class="hint">HTTP and HTTPS are supported. HTTP connections are unencrypted.</p>
       <button id="connect" type="submit">Connect</button>
     </form>
     <p id="status" role="status" aria-live="polite"></p>
-    <p class="hint">To change servers, press Android Back at the first page, or hold two fingers on the screen to open app controls.</p>
+    <p class="hint">For app controls and connection history, press Android Back at the first page, or hold two fingers on the screen.</p>
   </main>
 </body>
 </html>

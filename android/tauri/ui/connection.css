@@ -13,3 +13,17 @@ button:disabled { opacity: .6; cursor: wait; }
 .hint { color: #b9afc9; font-size: 14px; }
 .divider { color: #b9afc9; margin: 28px 0; text-align: center; }
 #status { min-height: 24px; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+#connection-history { margin-top: 14px; border: 1px solid #59476e; border-radius: 12px; overflow: hidden; }
+#connection-history summary { min-height: 48px; padding: 12px 16px; cursor: pointer; font-size: 15px; font-weight: 600; }
+.history-hint { margin: 0; padding: 0 16px 12px; color: #bdb4cc; font-size: 14px; }
+#history-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; }
+#history-list li { display: flex; align-items: stretch; border-top: 1px solid #3e324e; }
+#history-list button { margin: 0; border: 0; border-radius: 0; background: transparent; color: inherit; cursor: pointer; }
+#history-list .history-server { flex: 1; min-width: 0; width: auto; text-align: left; padding: 12px 16px; }
+.history-hostname, .history-address { display: block; overflow-wrap: anywhere; }
+.history-hostname { font-size: 15px; font-weight: 600; }
+.history-address { margin-top: 3px; font-size: 12px; font-weight: 400; color: #bdb4cc; }
+#history-list .history-remove { flex: 0 0 auto; width: auto; min-width: 64px; min-height: 48px; padding: 10px; font-size: 12px; font-weight: 400; color: #d4bfed; }
+#history-list button:hover { background: #ffffff0a; }
+#history-list :focus-visible { outline-offset: -3px; }

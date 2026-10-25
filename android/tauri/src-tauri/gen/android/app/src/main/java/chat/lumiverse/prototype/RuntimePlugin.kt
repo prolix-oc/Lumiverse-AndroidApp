@@ -30,6 +30,7 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
     private var webView: WebView? = null
     private var downloads: NativeDownloads? = null
     private var browserWindows: NativeBrowserWindows? = null
+    private var connectionHistory: NativeConnectionHistory? = null
     private var launcherUrl = "http://tauri.localhost/index.html"
     private var entryHistoryIndex = 0
     private var localAttempt = 0
@@ -46,6 +47,7 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
         webView.settings.allowContentAccess = false
         CookieManager.getInstance().setAcceptCookie(true)
         browserWindows = NativeBrowserWindows(activity, webView)
+        connectionHistory = NativeConnectionHistory(activity, webView)
         installControls(webView)
         downloads = NativeDownloads(activity, webView)
         (activity as? MainActivity)?.let {
@@ -66,13 +68,18 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
                     "info" -> invoke.resolve(JSObject().apply {
                         put("mode", preferences.getString("mode", null))
                         put("server", preferences.getString("server", null))
+                        put("history", connectionHistory?.entries())
                     })
+                    "forget" -> {
+                        connectionHistory?.forget(ServerAddress.normalize(args.server))
+                        invoke.resolve(JSObject().apply { put("history", connectionHistory?.entries()) })
+                    }
                     "remote" -> {
                         val server = ServerAddress.normalize(args.server)
                         stopLocal()
                         preferences.edit().putString("mode", "remote").putString("server", server).apply()
                         invoke.resolve()
-                        navigate(server)
+                        navigate(server, remote = true)
                     }
                     "local" -> startLocal(invoke)
                     else -> invoke.reject("Unknown connection action.")
@@ -81,10 +88,11 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
-    private fun navigate(url: String) {
+    private fun navigate(url: String, remote: Boolean = false) {
         val view = webView ?: return
         val native = activity as? MainActivity
-        val local = preferences.getString("mode", null) == "local"
+        val local = !remote && preferences.getString("mode", null) == "local"
+        connectionHistory?.select(if (remote) url else null)
         val origin = NativeNotifications.origin(url)
         // Consume before selecting: a restarted embedded backend has a new port.
         // Selection still clears its obsolete credential; the authenticated page reconciles it.
@@ -144,20 +152,21 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
         pendingLocal?.reject("Connection changed."); pendingLocal = null
     }
 
-    private fun showConnectionPage() {
+    private fun showConnectionPage(history: Boolean = false) {
         stopLocal()
         NativeNotifications.clear(activity)
-        navigate("$launcherUrl?changeServer=1")
+        navigate("$launcherUrl?changeServer=1" + if (history) "&history=1" else "")
     }
 
     private fun showControls() {
         if (controls?.isShowing == true || activity.isFinishing) return
         controls = AlertDialog.Builder(activity).setTitle("Lumiverse")
-            .setItems(arrayOf("Reload", "Change server", "Close app")) { _, which ->
+            .setItems(arrayOf("Reload", "Change server", "Connection history", "Close app")) { _, which ->
                 when (which) {
                     0 -> webView?.reload()
                     1 -> showConnectionPage()
-                    2 -> activity.finish()
+                    2 -> showConnectionPage(history = true)
+                    3 -> activity.finish()
                 }
             }.setNegativeButton("Cancel", null).show()
     }
@@ -202,6 +211,7 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
         handler.removeCallbacksAndMessages(null)
         controls?.dismiss()
         browserWindows?.destroy(); browserWindows = null
+        connectionHistory?.destroy(); connectionHistory = null
         downloads?.destroy(); downloads = null
         stopLocal()
         (activity as? MainActivity)?.let { it.notificationBridge?.destroy(); it.notificationBridge = null; it.notificationNavigation = null }

@@ -10,6 +10,11 @@ The selected connection is saved for the next launch. Remote mode does not start
 the embedded backend. Switching modes preserves the on-device database; remote
 data remains on the selected server. HTTP connections are unencrypted.
 
+Expand **Connection history** below the server address to see the ten most recent
+successful remote connections saved on this device. Select an address, then tap
+**Connect**, or choose **Remove** to delete an entry from history. App controls
+also have a **Connection history** shortcut that opens the list while connected.
+
 Remote mode uses the hosted server's frontend. Deploy the updated frontend on
 that server to receive the scrolling and import-refresh fixes there too.
 

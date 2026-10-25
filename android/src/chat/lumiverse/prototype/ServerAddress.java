@@ -15,8 +15,10 @@ public final class ServerAddress {
                 || uri.getPort() < -1 || uri.getPort() == 0 || uri.getPort() > 65535) {
                 throw new IllegalArgumentException("Enter an HTTP or HTTPS server address without credentials, a path, or query parameters.");
             }
+            int port = uri.getPort();
+            if (("https".equalsIgnoreCase(scheme) && port == 443) || ("http".equalsIgnoreCase(scheme) && port == 80)) port = -1;
             return new URI(scheme.toLowerCase(java.util.Locale.ROOT), null,
-                uri.getHost().toLowerCase(java.util.Locale.ROOT), uri.getPort(), "/", null, null).toASCIIString();
+                uri.getHost().toLowerCase(java.util.Locale.ROOT), port, "/", null, null).toASCIIString();
         } catch (URISyntaxException error) {
             throw new IllegalArgumentException("Enter a valid HTTP or HTTPS server address.");
         }
