@@ -8,6 +8,7 @@ import { initDatabase, closeDatabase } from "../src/db/connection";
 import { runMigrations } from "../src/db/migrate";
 import { hasConfiguredOwner } from "../src/runtime/bundle-setup";
 import { configureAndroidOwner } from "./setup";
+import { importActivityFromMessage, importCancellation } from "./import-protocol";
 
 const root = resolve(import.meta.dir, "..");
 const data = process.env.DATA_DIR;
@@ -27,6 +28,7 @@ let backendError = "";
 let configured = hasConfiguredOwner(data);
 let executor: DatabaseExecutor | undefined;
 let stopping = false;
+let backendIpcToken = "";
 
 function log(text: string) {
   logs.push(text.slice(0, 4000));
@@ -127,11 +129,14 @@ async function launchBackend(input: Record<string, unknown>) {
     }
   } catch (error) { backendState = "stopped"; throw error; }
   const readyToken = randomBytes(32).toString("hex");
+  backendIpcToken = readyToken;
   const childEnv = { ...process.env, PORT: String(port), LUMIVERSE_HOST: "127.0.0.1", FRONTEND_DIR: join(root, "frontend/dist"),
     LUMIVERSE_BUNDLE_READY_TOKEN: readyToken };
   try { backend = Bun.spawn([process.execPath, "--no-env-file", "--smol", join(root, "src/index.ts")], {
     cwd: root, env: childEnv, stdout: "pipe", stderr: "pipe",
     ipc(message) {
+      const activity = importActivityFromMessage(message, readyToken);
+      if (activity) console.log(`LUMIVERSE_ANDROID_IMPORT ${JSON.stringify(activity)}`);
       if (message?.type === "bundle-ready" && message.token === readyToken) {
         backendState = "running";
         backendUrl = `http://127.0.0.1:${port}/`;
@@ -140,7 +145,10 @@ async function launchBackend(input: Record<string, unknown>) {
         console.log(`LUMIVERSE_ANDROID_BACKEND_READY ${backendUrl}`);
       }
     },
-    onExit(_child, code) { backendState = `exited (${code})`; backendUrl = ""; backendError = "Please try again. Your local data is saved."; },
+    onExit(_child, code) {
+      backendState = `exited (${code})`; backendUrl = ""; backendError = "Please try again. Your local data is saved.";
+      if (!stopping) console.log(`LUMIVERSE_ANDROID_BACKEND_EXITED ${code}`);
+    },
   }); } catch (error) { backendState = "stopped"; throw error; }
   const child = backend;
   async function drain(stream: ReadableStream<Uint8Array>) {
@@ -199,3 +207,22 @@ async function shutdown() {
 }
 process.on("SIGTERM", () => void shutdown());
 process.on("SIGINT", () => void shutdown());
+
+// The native service writes cancellation to this private stdin pipe. It never
+// reaches a public HTTP endpoint and carries no WebView authentication data.
+void (async () => {
+  const decoder = new TextDecoder();
+  let pending = "";
+  for await (const bytes of Bun.stdin.stream()) {
+    pending += decoder.decode(bytes, { stream: true });
+    let newline: number;
+    while ((newline = pending.indexOf("\n")) >= 0) {
+      const jobId = importCancellation(pending.slice(0, newline));
+      pending = pending.slice(newline + 1);
+      if (jobId && backend && backendState === "running") {
+        backend.send({ type: "android-import-cancel", token: backendIpcToken, jobId });
+      }
+    }
+    if (pending.length > 1024) pending = "";
+  }
+})().catch(error => log(`Native import control: ${String(error)}`));

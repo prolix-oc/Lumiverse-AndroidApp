@@ -19,6 +19,9 @@ import android.widget.TextView
 class NativeBrowserWindows(private val activity: Activity, private val main: WebView) {
     private val original = main.webChromeClient
     private val windows = linkedMapOf<WebView, Dialog>()
+    private val microphone = (activity as? MainActivity)?.let { NativeMicrophone(it, main) }
+
+    fun select(url: String?) { microphone?.select(url) }
 
     init {
         main.settings.setSupportMultipleWindows(true)
@@ -92,6 +95,7 @@ class NativeBrowserWindows(private val activity: Activity, private val main: Web
     }
 
     fun destroy() {
+        microphone?.destroy()
         windows.values.toList().asReversed().forEach { it.dismiss() }
         main.webChromeClient = original
     }
@@ -107,9 +111,11 @@ class NativeBrowserWindows(private val activity: Activity, private val main: Web
         override fun onShowFileChooser(view: WebView, reply: ValueCallback<Array<Uri>>, params: FileChooserParams) =
             delegate?.onShowFileChooser(view, reply, NativeFileTypes.importParams(params)) ?: false
         override fun onPermissionRequest(request: PermissionRequest) {
-            if (delegate != null) delegate.onPermissionRequest(request) else request.deny()
+            if (delegate != null && request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+                if (microphone != null) microphone.request(request) else request.deny()
+            } else if (delegate != null) delegate.onPermissionRequest(request) else request.deny()
         }
-        override fun onPermissionRequestCanceled(request: PermissionRequest) { delegate?.onPermissionRequestCanceled(request) }
+        override fun onPermissionRequestCanceled(request: PermissionRequest) { microphone?.cancel(request); delegate?.onPermissionRequestCanceled(request) }
         override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
             if (delegate != null) delegate.onGeolocationPermissionsShowPrompt(origin, callback) else callback.invoke(origin, false, false)
         }

@@ -19,6 +19,7 @@ public final class RuntimeHost {
     public interface Listener {
         void ready(String url);
         default void backendReady(String url) { ready(url); }
+        default void importActivity(JSONObject activity) { }
         void failed(String message);
     }
     private final Context context;
@@ -34,6 +35,15 @@ public final class RuntimeHost {
     public void start() { new Thread(this::startRuntime, "lumiverse-runtime").start(); }
     public synchronized void stop() { destroyed = true; if (runtime != null) runtime.destroy(); }
     public String diagnosticsUrl() { return diagnosticsUrl; }
+    public synchronized void cancelImport(String jobId) {
+        if (runtime == null || destroyed || !jobId.matches("[\\w-]{1,128}")) return;
+        try {
+            JSONObject command = new JSONObject();
+            command.put("action", "cancel-import"); command.put("jobId", jobId);
+            runtime.getOutputStream().write((command.toString() + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            runtime.getOutputStream().flush();
+        } catch (Exception error) { if (!destroyed) listener.failed("Could not cancel import: " + error.getMessage()); }
+    }
     private File getFilesDir() { return context.getFilesDir(); }
     private File getCacheDir() { return context.getCacheDir(); }
     private AssetManager getAssets() { return context.getAssets(); }
@@ -176,6 +186,10 @@ public final class RuntimeHost {
                             || uri.getPort() > 65535 || !url.equals("http://127.0.0.1:" + uri.getPort() + "/"))
                             throw new IOException("Invalid local backend address");
                         if (!destroyed) listener.backendReady(url);
+                    } else if (line.startsWith("LUMIVERSE_ANDROID_IMPORT ")) {
+                        if (!destroyed) listener.importActivity(new JSONObject(line.substring("LUMIVERSE_ANDROID_IMPORT ".length())));
+                    } else if (line.startsWith("LUMIVERSE_ANDROID_BACKEND_EXITED ")) {
+                        if (!destroyed) listener.failed("Local server stopped. Reopen Lumiverse to resume any interrupted restore.");
                     } else {
                         synchronized (output) {
                             output.append(line).append('\n');

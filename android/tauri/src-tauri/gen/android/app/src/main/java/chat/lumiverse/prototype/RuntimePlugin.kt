@@ -3,8 +3,15 @@ package chat.lumiverse.prototype
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.content.ComponentName
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
+import android.os.Messenger
+import android.os.RemoteException
 import android.view.MotionEvent
 import android.webkit.CookieManager
 import android.webkit.WebView
@@ -26,7 +33,9 @@ class ConnectionArgs {
 
 @TauriPlugin
 class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
-    private var runtime: RuntimeHost? = null
+    private var runtimeMessenger: Messenger? = null
+    private var runtimeClient: Messenger? = null
+    private var serviceConnection: ServiceConnection? = null
     private var webView: WebView? = null
     private var downloads: NativeDownloads? = null
     private var browserWindows: NativeBrowserWindows? = null
@@ -35,6 +44,7 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
     private var entryHistoryIndex = 0
     private var localAttempt = 0
     private var pendingLocal: Invoke? = null
+    private var openingRestore = false
     private var controls: AlertDialog? = null
     private val handler = Handler(Looper.getMainLooper())
     private val preferences get() = activity.getSharedPreferences("lumiverse-connection", Context.MODE_PRIVATE)
@@ -66,7 +76,9 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
                 launcherUrl = view.url?.substringBefore('?') ?: launcherUrl
                 when (args.action) {
                     "info" -> invoke.resolve(JSObject().apply {
-                        put("mode", preferences.getString("mode", null))
+                        openingRestore = activity.intent.getBooleanExtra(RuntimeService.OPEN_RESTORE, false)
+                        if (openingRestore) activity.intent.removeExtra(RuntimeService.OPEN_RESTORE)
+                        put("mode", if (openingRestore) "local" else preferences.getString("mode", null))
                         put("server", preferences.getString("server", null))
                         put("history", connectionHistory?.entries())
                     })
@@ -99,23 +111,36 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
         val target = origin?.let { selected -> NativeNotifications.consumeTap(activity, activity.intent, selected, local)?.let { selected + it } } ?: url
         native?.notificationBridge?.select(url, local)
         downloads?.select(url)
+        browserWindows?.select(url)
         entryHistoryIndex = view.copyBackForwardList().currentIndex + 1
         view.loadUrl(target)
     }
 
     private fun openPendingNotification() {
         val view = webView ?: return
+        if (activity.intent.getBooleanExtra(RuntimeService.OPEN_RESTORE, false)) {
+            // A cold launch first needs the packaged connection page's command.
+            if (view.url?.startsWith(launcherUrl) == true) return
+            activity.intent.removeExtra(RuntimeService.OPEN_RESTORE)
+            openingRestore = true
+            startLocal(null)
+            return
+        }
         val origin = NativeNotifications.origin(view.url) ?: return
         val path = NativeNotifications.consumeTap(activity, activity.intent, origin) ?: return
         val target = origin + path
         if (!NotificationPolicy.isCurrentChat(view.url, target)) view.loadUrl(target)
     }
 
-    private fun startLocal(invoke: Invoke) {
+    private fun startLocal(invoke: Invoke?) {
         stopLocal()
         pendingLocal = invoke
         val attempt = localAttempt
-        runtime = RuntimeHost(activity, "tauri", object : RuntimeHost.Listener {
+        val listener = object : RuntimeHost.Listener {
+            override fun importActivity(activity: JSONObject) {
+                val native = this@RuntimePlugin.activity as? MainActivity ?: return
+                if (native.nativeActive && NativeNotifications.permission(native) == "default") native.requestNotificationPermission { }
+            }
             override fun ready(url: String) { activity.runOnUiThread {
                 if (attempt != localAttempt) return@runOnUiThread
                 preferences.edit().putString("mode", "local").apply()
@@ -123,12 +148,17 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
                 // This is the setup server, not the authenticated backend.
                 // Preserve pending notification taps until backendReady selects it.
                 val view = webView ?: return@runOnUiThread
+                browserWindows?.select(null)
                 entryHistoryIndex = view.copyBackForwardList().currentIndex + 1
                 view.loadUrl(url)
             } }
             override fun backendReady(url: String) { activity.runOnUiThread {
                 if (attempt != localAttempt) return@runOnUiThread
-                navigate(url)
+                preferences.edit().putString("mode", "local").apply()
+                pendingLocal?.resolve(); pendingLocal = null
+                val target = if (openingRestore) "$url?restoreImport=1" else url
+                openingRestore = false
+                navigate(target)
             } }
             override fun failed(message: String) { activity.runOnUiThread {
                 if (attempt != localAttempt) return@runOnUiThread
@@ -142,13 +172,51 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
                         .setPositiveButton("OK", null).show()
                 }
             } }
-        }).also { it.start() }
+        }
+        val client = Messenger(object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(message: Message) {
+                if (attempt != localAttempt) return
+                when (message.what) {
+                    RuntimeService.READY -> message.data.getString("url")?.let { listener.ready(it) }
+                    RuntimeService.BACKEND_READY -> message.data.getString("url")?.let { listener.backendReady(it) }
+                    RuntimeService.FAILED -> message.data.getString("message")?.let { listener.failed(it) }
+                    RuntimeService.IMPORT_STARTED -> message.data.getString("activity")?.let { listener.importActivity(JSONObject(it)) }
+                }
+            }
+        })
+        runtimeClient = client
+        val context = activity.applicationContext
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+                if (attempt != localAttempt) return
+                runtimeMessenger = Messenger(binder)
+                try { runtimeMessenger?.send(Message.obtain(null, RuntimeService.ATTACH).apply { replyTo = client }) }
+                catch (_: RemoteException) { listener.failed("Could not attach to the local server service.") }
+            }
+            override fun onServiceDisconnected(name: ComponentName) {
+                if (attempt != localAttempt) return
+                runtimeMessenger = null
+                listener.failed("The local server stopped. Open Lumiverse again to recover the restore.")
+            }
+        }
+        try {
+            // A started service can outlive its activity. Foreground promotion
+            // is limited to actual restore work reported by the backend.
+            context.startService(Intent(context, RuntimeService::class.java))
+            check(context.bindService(Intent(context, RuntimeService::class.java), connection, Context.BIND_AUTO_CREATE)) { "Could not connect to the local server service." }
+            serviceConnection = connection
+        } catch (error: Exception) { listener.failed(error.message ?: "Could not start the local server.") }
     }
 
     private fun stopLocal() {
         if (NativeNotifications.isLocal(activity)) LocalNotificationTransport.stop()
         localAttempt += 1
-        runtime?.stop(); runtime = null
+        runtimeClient?.let { client ->
+            try { runtimeMessenger?.send(Message.obtain(null, RuntimeService.DETACH).apply { replyTo = client }) }
+            catch (_: RemoteException) { /* the service has already stopped */ }
+        }
+        serviceConnection?.let { activity.applicationContext.unbindService(it) }
+        runtimeMessenger = null; runtimeClient = null; serviceConnection = null
         pendingLocal?.reject("Connection changed."); pendingLocal = null
     }
 

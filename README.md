@@ -35,6 +35,41 @@ caches live in `.tmp/android-native`. The legacy Termux/glibc builder and its
 patches live in `scripts/build-lancedb-android.sh` and `vendor/lancedb-android`;
 they are separate from the APK's Android NDK build.
 
+## Local backup restores
+
+`RuntimeService` owns the embedded server in its own Android process, connected
+to the activity through a private Messenger binding. This also survives Tauri's
+UI process exit when the activity closes. A restore
+promotes it to a `dataSync` foreground service with progress, a cancel action, and
+a partial wake lock while processing. Waiting for a decryption ticket releases
+the wake lock. Returning through the notification selects local hosting and opens
+Data Portability. An idle, detached service stops after 30 seconds.
+
+The backend persists account-scoped job records and retains an interrupted
+archive for an explicit **Resume import**. Resume replays merge operations,
+publishes restored files atomically, and avoids duplicate vectors. Tickets and
+decryption material are never written to job records. Android's foreground time
+limit stops the runtime cleanly; force-stop and device restart also require
+reopening the app. There is no automatic boot restart.
+
+## Microphone access
+
+The main WebView handles audio-capture requests through `NativeMicrophone` and
+Android's `RECORD_AUDIO` runtime permission. Consent is scoped to the selected
+server for the current activity. Only audio capture is granted; child browser
+windows and requests from another origin are denied. Remote microphone use needs
+HTTPS; the embedded loopback server is also supported. This enables recording and
+recording-based speech providers; WebView support for browser speech recognition
+is separate from microphone permission.
+
+The device smoke test accepts `--background-restore` and `--microphone` alongside
+`--attempt-backend --require-tauri`. Use a disposable, explicitly selected emulator
+and `LUMIVERSE_ANDROID_TEST_PASSWORD` for an existing `prototypecheck` account. The
+background check destroys the activity and turns off the screen; the microphone
+check exercises refusal, Android permission approval, and recorded audio output.
+For headless audio checks, `--microphone-virtual-tone` mixes a generated tone with
+the granted live capture track so host microphone input can remain disabled.
+
 ## Remote notifications
 
 Official builds use `android/firebase/google-services.json` for Firebase project

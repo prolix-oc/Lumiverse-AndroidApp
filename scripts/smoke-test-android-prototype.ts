@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { checkAndroidBackupRestore } from "./android-backup-smoke";
+import { checkAndroidBackgroundRestore } from "./android-background-restore-smoke";
+import { checkAndroidMicrophone } from "./android-microphone-smoke";
 
 const args = process.argv.slice(2);
 const serialIndex = args.indexOf("--serial");
@@ -22,7 +24,7 @@ async function command(...args: string[]) {
   if (code !== 0) throw new Error(`${args[0]} failed: ${err || out}`);
   return out.trim();
 }
-async function evaluate<T>(expression: string, diagnostics = false, timeoutMs = 15000): Promise<T> {
+async function evaluate<T>(expression: string, diagnostics = false, timeoutMs = 15000, userGesture = false): Promise<T> {
   const pid = (await command("shell", "pidof", app)).split(" ")[0];
   const port = await command("forward", "tcp:0", `localabstract:webview_devtools_remote_${pid}`);
   try {
@@ -33,7 +35,7 @@ async function evaluate<T>(expression: string, diagnostics = false, timeoutMs = 
       const socket = new WebSocket(page.webSocketDebuggerUrl);
       const timer = setTimeout(() => { socket.close(); reject(new Error("WebView evaluation timed out")); }, timeoutMs);
       const finish = () => { clearTimeout(timer); socket.close(); };
-      socket.onopen = () => socket.send(JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } }));
+      socket.onopen = () => socket.send(JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true, userGesture } }));
       socket.onerror = () => { finish(); reject(new Error("WebView debugging connection failed")); };
       socket.onmessage = event => {
         const reply = JSON.parse(String(event.data));
@@ -122,6 +124,10 @@ async function start() {
     throw new Error("The connection page or local runtime did not become ready")
   }
 }
+if (args.includes("--microphone")) {
+  await command("shell", "pm", "revoke", app, "android.permission.RECORD_AUDIO");
+  await command("shell", "pm", "clear-permission-flags", app, "android.permission.RECORD_AUDIO", "user-set", "user-fixed");
+}
 await command("shell", "am", "force-stop", app);
 await start();
 const first = await waitForStatus();
@@ -160,7 +166,7 @@ if (apk) {
   const manifest = await Bun.file(apk + ".json").json();
   assert.equal(updated.bundleId, manifest.payloadSha256, "Updated app must run the selected APK payload");
 }
-let backendAttempt: { state: string; output: string; http?: object; frontend?: object; backupRestore?: object; extensionInstall?: object; extensionInstalls?: object[]; automaticRelaunch?: boolean } | undefined;
+let backendAttempt: { state: string; output: string; http?: object; frontend?: object; backupRestore?: object; backgroundRestore?: object; microphone?: object; extensionInstall?: object; extensionInstalls?: object[]; automaticRelaunch?: boolean } | undefined;
 if (args.includes("--attempt-backend")) {
   const testPassword = process.env.LUMIVERSE_ANDROID_TEST_PASSWORD || crypto.randomUUID() + crypto.randomUUID();
   const before = await runtimeStatus();
@@ -237,7 +243,8 @@ if (args.includes("--attempt-backend")) {
       const safeArea = await evaluate<{ top: number; bottom: number }>(`(() => {const probe=document.createElement('div');probe.style.padding='env(safe-area-inset-top) 0 env(safe-area-inset-bottom)';document.body.append(probe);const style=getComputedStyle(probe);const result={top:parseFloat(style.paddingTop),bottom:parseFloat(style.paddingBottom)};probe.remove();return result;})()`);
       assert.deepEqual(safeArea, { top: 0, bottom: 0 }, "Native bar padding must not also become CSS safe-area padding");
       backendAttempt.frontend = { automaticNavigation: "passed", entry, platform: "android", desktopIntegrations: "disabled", tauriBridge: "working", insets: { statusBarBottom, webViewTop, cssSafeArea: safeArea } };
-      if (args.includes("--restore-backup") || args.includes("--install-extension")) {
+      if (args.includes("--microphone")) backendAttempt.microphone = await checkAndroidMicrophone(expression => evaluate(expression, false, 15_000, true), command, args.includes("--microphone-virtual-tone"));
+      if (args.includes("--restore-backup") || args.includes("--background-restore") || args.includes("--install-extension")) {
         assert.ok(!before.configured || process.env.LUMIVERSE_ANDROID_TEST_PASSWORD, "Set LUMIVERSE_ANDROID_TEST_PASSWORD for an existing prototypecheck account");
         assert.equal(await evaluate(`fetch('/api/auth/sign-in/username',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'prototypecheck',password:${JSON.stringify(testPassword)}})}).then(r=>r.status)`), 200);
         await evaluate("setTimeout(()=>location.reload(),50); true");
@@ -248,6 +255,7 @@ if (args.includes("--attempt-backend")) {
           await Bun.sleep(500);
         }
         if (args.includes("--restore-backup")) backendAttempt.backupRestore = await checkAndroidBackupRestore(evaluate);
+        if (args.includes("--background-restore")) backendAttempt.backgroundRestore = await checkAndroidBackgroundRestore(evaluate, command, testPassword);
         for (const [index, arg] of args.entries()) {
           if (arg !== "--install-extension") continue;
           const url = args[index + 1];

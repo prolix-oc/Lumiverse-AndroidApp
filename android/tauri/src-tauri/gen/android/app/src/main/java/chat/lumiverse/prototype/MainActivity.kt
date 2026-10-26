@@ -20,6 +20,21 @@ class MainActivity : TauriActivity() {
   var notificationBridge: NativeNotificationBridge? = null
   var notificationNavigation: (() -> Unit)? = null
   private var permissionReply: ((Boolean) -> Unit)? = null
+  private var microphoneReply: ((Boolean) -> Unit)? = null
+  private val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    val reply = microphoneReply
+    microphoneReply = null
+    reply?.invoke(granted)
+  }
+  fun requestMicrophonePermission(reply: (Boolean) -> Unit) {
+    if (androidx.core.content.ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+      reply(true); return
+    }
+    if (microphoneReply != null || isFinishing || isDestroyed) { reply(false); return }
+    microphoneReply = reply
+    try { microphonePermission.launch(Manifest.permission.RECORD_AUDIO) }
+    catch (_: RuntimeException) { microphoneReply = null; reply(false) }
+  }
   private var exportDirectoryReply: ((Uri?, String?) -> Unit)? = null
   private var exportDirectoryDialog: AlertDialog? = null
   private val exportDirectory = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -70,6 +85,7 @@ class MainActivity : TauriActivity() {
   override fun onResume() { super.onResume(); nativeActive = true; notificationBridge?.resume(); notificationNavigation?.invoke() }
   override fun onPause() { nativeActive = false; notificationBridge?.lifecycle(false); super.onPause() }
   override fun onDestroy() {
+    microphoneReply?.invoke(false); microphoneReply = null
     exportDirectoryReply?.invoke(null, "The app is closing."); exportDirectoryReply = null
     exportDirectoryDialog?.dismiss(); exportDirectoryDialog = null
     super.onDestroy()
