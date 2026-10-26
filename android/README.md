@@ -18,6 +18,11 @@ also have a **Connection history** shortcut that opens the list while connected.
 Remote mode uses the hosted server's frontend. Deploy the updated frontend on
 that server to receive the scrolling and import-refresh fixes there too.
 
+Character imports in the APK can select `.charx` files even when Android labels
+them as ZIP archives or unknown files. These pickers show all file types;
+Lumiverse validates the selected card when importing. Character exports retain
+the `.charx` extension in Downloads and in a selected export folder.
+
 Native clients skip the browser's silent audio unlock workaround. Notification
 sounds and enabled TTS playback initialize audio only when a sound is requested;
 touching the app or sending a text message does not play a silent file or buffer.
@@ -43,6 +48,7 @@ On an explicitly selected test emulator with the APK installed:
 
 ```sh
 bun run scripts/smoke-test-android-connection.ts --serial emulator-5554
+bun run scripts/smoke-test-android-exports.ts --serial emulator-5554
 bun run scripts/smoke-test-android-prototype.ts --serial emulator-5554 --require-tauri --require-native --attempt-backend
 ```
 
@@ -52,3 +58,6 @@ mode. The backend smoke test checks native libraries, storage persistence, and
 frontend startup. Add `--restore-backup` on a fresh disposable install, or supply
 `LUMIVERSE_ANDROID_TEST_PASSWORD` for its existing `prototypecheck` test account,
 to verify real backup restoration and the frontend reload.
+
+The export smoke test verifies CHARX downloads and re-imports through the native
+file picker. Add `--storage-recovery` to exercise the selected-folder fallback.

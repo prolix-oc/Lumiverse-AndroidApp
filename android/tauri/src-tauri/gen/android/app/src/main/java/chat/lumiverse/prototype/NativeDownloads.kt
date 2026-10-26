@@ -11,7 +11,6 @@ import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.webkit.CookieManager
-import android.webkit.URLUtil
 import android.webkit.WebView
 import android.widget.Toast
 import android.widget.TextView
@@ -58,7 +57,7 @@ class NativeDownloads(private val activity: Activity, private val view: WebView)
         view.setDownloadListener { url, userAgent, disposition, mimeType, _ ->
             val origin = DownloadPolicy.trustedOrigin(selected, view.url)
             if (origin != null && DownloadPolicy.allowsRedirect(origin, url)) {
-                startUrl(url, URLUtil.guessFileName(url, disposition, mimeType), userAgent, origin)
+                startUrl(url, NativeFileTypes.downloadFilename(url, disposition, mimeType), userAgent, origin)
             } else show("Export failed. This download is not from the selected server.")
         }
         handler.postDelayed(object : Runnable {
@@ -200,7 +199,7 @@ class NativeDownloads(private val activity: Activity, private val view: WebView)
                         } else {
                             check(response.isSuccessful) { "Download failed (${response.code})." }
                             val body = response.body ?: error("The download was empty.")
-                            val name = filename.ifBlank { URLUtil.guessFileName(target, response.header("Content-Disposition"), body.contentType()?.toString()) }
+                            val name = filename.ifBlank { NativeFileTypes.downloadFilename(target, response.header("Content-Disposition"), body.contentType()?.toString()) }
                             stage = "create the file in Downloads/Lumiverse"
                             val output = create(name, body.contentType()?.toString() ?: "application/octet-stream", body.contentLength())
                             item = output

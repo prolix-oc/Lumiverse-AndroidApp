@@ -105,7 +105,7 @@ class NativeBrowserWindows(private val activity: Activity, private val main: Web
         override fun onProgressChanged(view: WebView, progress: Int) { delegate?.onProgressChanged(view, progress) }
         override fun onConsoleMessage(message: ConsoleMessage) = delegate?.onConsoleMessage(message) ?: false
         override fun onShowFileChooser(view: WebView, reply: ValueCallback<Array<Uri>>, params: FileChooserParams) =
-            delegate?.onShowFileChooser(view, reply, params) ?: false
+            delegate?.onShowFileChooser(view, reply, NativeFileTypes.importParams(params)) ?: false
         override fun onPermissionRequest(request: PermissionRequest) {
             if (delegate != null) delegate.onPermissionRequest(request) else request.deny()
         }

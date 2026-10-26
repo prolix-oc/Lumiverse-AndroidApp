@@ -3,10 +3,12 @@
 import assert from 'node:assert/strict'
 import { join } from 'node:path'
 import { build, type OutputFile } from 'esbuild'
+import { zipSync, strToU8 } from 'fflate'
 import { backendRoot } from './backend-project'
 
 const serial = process.argv[process.argv.indexOf('--serial') + 1]
 if (!serial?.startsWith('emulator-')) throw new Error('Select a test emulator with --serial emulator-PORT')
+const { detectCharacterImportFormat, extractCardFromCharx } = await import(join(backendRoot(), 'src/services/character-card.service.ts'))
 const adb = join(process.env.ANDROID_HOME || join(process.env.HOME!, 'Library/Android/sdk'), 'platform-tools/adb')
 const app = 'chat.lumiverse.prototype'
 const prefix = `lumiverse-export-smoke-${Date.now()}`
@@ -19,6 +21,12 @@ const preferencesBackup = `files/${prefix}-preferences.xml`
 let backedUpPreferences = false
 let blockedDirectory = false
 const bytes = Uint8Array.from({ length: 180000 }, (_, index) => index % 256)
+const charx = new Uint8Array(zipSync({
+  'card.json': strToU8(JSON.stringify({
+    spec: 'chara_card_v3', spec_version: '3.0',
+    data: { name: 'Android CHARX round trip', description: 'Picker regression fixture' },
+  })),
+}))
 const lorebook = JSON.stringify({ name: 'Lorebook 世界', entries: Array.from({ length: 2000 }, (_, id) => ({ id, content: '🌌 lore '.repeat(100) })) }, null, 2)
 const fixture = await build({
   absWorkingDir: backendRoot(), entryPoints: ['frontend/tests/ui-scale.fixture.tsx'],
@@ -43,7 +51,7 @@ const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: request => {
   if (path === '/archive' || path === '/attachment') {
     if (!request.headers.get('Cookie')?.includes('export-smoke=1')) return new Response('Missing cookie', { status: 401 })
     authenticated++
-    return new Response(bytes, { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${prefix}-attachment.charx"` } })
+    return new Response(charx, { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${prefix}-attachment.charx"` } })
   }
   return new Response(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Android export smoke</title><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script src="/fixture.js"></script></body></html>`,
     { headers: { 'Content-Type': 'text/html', 'Set-Cookie': 'export-smoke=1; Path=/; SameSite=Lax', 'Cache-Control': 'no-store', 'Content-Security-Policy': 'connect-src data:' } })
@@ -66,7 +74,7 @@ async function evaluate<T = unknown>(expression: string): Promise<T> {
     return await new Promise<T>((resolve, reject) => {
       const socket = new WebSocket(page.webSocketDebuggerUrl)
       const timer = setTimeout(() => { socket.close(); reject(new Error('WebView evaluation timed out')) }, 15000)
-      socket.onopen = () => socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression, awaitPromise: true, returnByValue: true } }))
+      socket.onopen = () => socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression, awaitPromise: true, returnByValue: true, userGesture: true } }))
       socket.onmessage = event => {
         const reply = JSON.parse(String(event.data))
         if (reply.id !== 1) return
@@ -111,12 +119,14 @@ async function expectFile(name: string, expected = bytes) {
   assert.equal(await child.exited, 0)
   assert.equal(Buffer.compare(Buffer.from(result), Buffer.from(expected)), 0, `Saved bytes for ${name} (${result.length}/${expected.length})`)
 }
-async function tapNative(label: string, attribute = 'text') {
+async function tapNative(label: string, attribute = 'text', resourceId?: string) {
   let bounds: RegExpMatchArray | null = null
   await waitFor(async () => {
     await command('shell', 'uiautomator', 'dump', '/sdcard/lumiverse-export-controls.xml')
     const xml = await command('shell', 'cat', '/sdcard/lumiverse-export-controls.xml')
-    bounds = xml.match(new RegExp(`${attribute}="${label}"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, 'i'))
+    const node = [...xml.matchAll(/<node\b[^>]*>/g)].map(match => match[0]).find(node =>
+      new RegExp(`${attribute}="${label}"`, 'i').test(node) && (!resourceId || node.includes(`resource-id="${resourceId}"`)))
+    bounds = node?.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/) ?? null
     return !!bounds
   }, `native control ${label}`)
   await command('shell', 'input', 'tap', String((+bounds![1]! + +bounds![3]!) / 2), String((+bounds![2]! + +bounds![4]!) / 2))
@@ -171,6 +181,31 @@ async function clickBlob(name: string, attached: boolean, mime = 'image/png') {
     if (${attached}) document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url); return true;
   })()`)
 }
+
+async function importExportedCharx(accept: string, multiple: boolean) {
+  await evaluate(`(() => {
+    window.charxPickerResult = null;
+    const input = document.createElement('input'); input.type = 'file';
+    input.accept = ${JSON.stringify(accept)}; input.multiple = ${multiple};
+    input.onchange = async () => {
+      const file = input.files[0];
+      window.charxPickerResult = file ? {name:file.name, type:file.type, bytes:Array.from(new Uint8Array(await file.arrayBuffer()))} : null;
+      input.remove();
+    };
+    document.body.append(input); input.click(); return true;
+  })()`)
+  await tapNative('Search', 'content-desc')
+  await command('shell', 'input', 'text', `${prefix}-attachment.charx`)
+  await command('shell', 'input', 'keyevent', '66')
+  await tapNative(`${prefix}-attachment.charx`, 'text', 'android:id/title')
+  await waitFor(() => evaluate('!!window.charxPickerResult'), 'selected CHARX delivered to WebView')
+  const selected = await evaluate<{ name: string; type: string; bytes: number[] }>('window.charxPickerResult')
+  assert.equal(selected.name, `${prefix}-attachment.charx`)
+  assert.deepEqual(new Uint8Array(selected.bytes), charx, 'Picker must return the complete, unchanged archive')
+  const file = new File([new Uint8Array(selected.bytes)], selected.name, { type: selected.type })
+  assert.equal(await detectCharacterImportFormat(file), 'charx')
+  assert.equal((await extractCardFromCharx(file)).card.name, 'Android CHARX round trip')
+}
 let saved: { mode: string | null; server: string | null } | undefined
 try {
   await command('reverse', `tcp:${server.port}`, `tcp:${server.port}`)
@@ -215,12 +250,17 @@ try {
   await evaluate(`(() => { const a=document.createElement('a'); a.href='data:application/json,%7B%22test%22%3Atrue%7D'; a.download='${prefix}-lorebook.json'; a.click(); return true })()`)
   await expectFile(`${prefix}-lorebook.json`, new TextEncoder().encode('{"test":true}'))
   await evaluate(`(() => { const a=document.createElement('a'); a.href='/archive'; a.download='${prefix}-archive.charx'; a.click(); return true })()`)
-  await expectFile(`${prefix}-archive.charx`)
+  await expectFile(`${prefix}-archive.charx`, charx)
   await evaluate("location.href='/attachment'; true")
-  await expectFile(`${prefix}-attachment.charx`)
+  await expectFile(`${prefix}-attachment.charx`, charx)
   // The listener route is first requested by WebView, then streamed by native code.
   assert.equal(authenticated, 3, 'Both native URL routes must preserve session cookies')
   console.log('Blob PNG, JSON, duplicates, authenticated URL exports and DownloadListener: passed')
+
+  await importExportedCharx('.json,.png,.charx,.jpg,.jpeg', true)
+  await importExportedCharx('.png,.json,.charx,.jpg,.jpeg,application/json,image/png', false)
+  await importExportedCharx('.charx', false)
+  console.log('CHARX export → Android picker → backend archive parser, character browser / Weaver / extension-only: passed')
 
   // Observe native replies without replacing the wrapper's request dispatcher.
   await evaluate(`(() => {
