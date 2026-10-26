@@ -14,6 +14,19 @@
     <p>Choose where your Lumiverse runs.</p>
     <button id="local" type="button">Use this device</button>
     <p class="hint">Run the included server and keep your data on this device.</p>
+    <details id="remote-access">
+      <summary>Remote access</summary>
+      <div class="remote-settings">
+        <label class="toggle" for="remote-enabled"><input id="remote-enabled" type="checkbox">Allow other devices to connect</label>
+        <label for="remote-port">Port</label>
+        <input id="remote-port" type="number" inputmode="numeric" min="1024" max="65535" step="1" value="7860" aria-describedby="remote-help" required>
+        <p id="remote-help" class="hint">Create your local account with Use this device first. Sign in from another client with that account. HTTP connections are unencrypted.</p>
+        <p id="remote-status" role="status" aria-live="polite"></p>
+        <button id="close-frontend" type="button" hidden>Close frontend and keep server running</button>
+        <p class="hint">While enabled, the server keeps running after you close the app. Battery optimization can interrupt access while the phone sleeps.</p>
+        <button id="battery-settings" class="secondary" type="button">Battery settings</button>
+      </div>
+    </details>
     <div class="divider">or connect to your server</div>
     <form id="connection-form">
       <label for="server">Server address</label>

@@ -10,6 +10,21 @@ The selected connection is saved for the next launch. Remote mode does not start
 the embedded backend. Switching modes preserves the on-device database; remote
 data remains on the selected server. HTTP connections are unencrypted.
 
+To let other clients connect to this device's backend, enable **Remote access**
+on the connection page or in the native app controls. Create your local account
+first. Choose a port (7860 by default), then use the displayed network address
+and your local login on the other client. **Close app** closes the frontend and
+keeps the server running while remote access is enabled. The persistent
+notification has a **Stop server** action; turning the toggle off instead returns
+to device-only access and reconnects the local frontend. Wait for any backup
+restore to finish before changing the toggle.
+
+Use a trusted network or a VPN: HTTP is unencrypted. If your network changes,
+turn remote access off and on to refresh the address. **Battery settings** opens
+Android's optimization settings; Doze or device-specific power management can
+interrupt screen-off access even with the foreground service. Force-stop and
+reboot require reopening Lumiverse and enabling remote access again.
+
 Expand **Connection history** below the server address to see the ten most recent
 successful remote connections saved on this device. Select an address, then tap
 **Connect**, or choose **Remove** to delete an entry from history. App controls

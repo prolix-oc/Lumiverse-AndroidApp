@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.res.AssetManager;
 import android.net.Uri;
+import android.database.sqlite.SQLiteDatabase;
 import org.json.JSONObject;
 import java.io.*;
 import java.nio.file.Files;
@@ -25,12 +26,28 @@ public final class RuntimeHost {
     private final Context context;
     private final String host;
     private final Listener listener;
+    private final int listenPort;
+    private final String trustedOrigins;
     private volatile Process runtime;
     private volatile boolean destroyed;
     private volatile String diagnosticsUrl;
     private final StringBuilder output = new StringBuilder();
     public RuntimeHost(Context context, String host, Listener listener) {
+        this(context, host, listener, 0, "");
+    }
+    public RuntimeHost(Context context, String host, Listener listener, int listenPort, String trustedOrigins) {
         this.context = context.getApplicationContext(); this.host = host; this.listener = listener;
+        this.listenPort = listenPort; this.trustedOrigins = trustedOrigins;
+    }
+    public static boolean hasConfiguredOwner(Context context) {
+        File data = new File(context.getFilesDir(), "lumiverse/data");
+        if (new File(data, "owner.credentials").isFile()) return true;
+        File database = new File(data, "lumiverse.db");
+        if (!database.isFile()) return false;
+        try (SQLiteDatabase db = SQLiteDatabase.openDatabase(database.getPath(), null, SQLiteDatabase.OPEN_READONLY);
+             android.database.Cursor rows = db.rawQuery("SELECT 1 FROM user LIMIT 1", null)) {
+            return rows.moveToFirst();
+        } catch (android.database.sqlite.SQLiteException error) { return false; }
     }
     public void start() { new Thread(this::startRuntime, "lumiverse-runtime").start(); }
     public synchronized void stop() { destroyed = true; if (runtime != null) runtime.destroy(); }
@@ -136,6 +153,11 @@ public final class RuntimeHost {
             Map<String, String> env = builder.environment();
             env.put("DATA_DIR", data.getAbsolutePath());
             env.put("LUMIVERSE_ANDROID_HOST", host);
+            if (listenPort != 0) {
+                env.put("LUMIVERSE_ANDROID_LISTEN_PORT", Integer.toString(listenPort));
+                // Android can deny Bun's getifaddrs(); native LinkProperties supplies exact origins.
+                env.put("TRUSTED_ORIGINS", trustedOrigins);
+            }
             env.put("LUMIVERSE_FFMPEG_PATH", new File(getApplicationInfo().nativeLibraryDir, "libffmpeg.so").getAbsolutePath());
             env.put("LUMIVERSE_FFPROBE_PATH", new File(getApplicationInfo().nativeLibraryDir, "libffprobe.so").getAbsolutePath());
             env.put("LUMIVERSE_ANDROID_TOKEN", hex(secret));
@@ -190,6 +212,8 @@ public final class RuntimeHost {
                         if (!destroyed) listener.importActivity(new JSONObject(line.substring("LUMIVERSE_ANDROID_IMPORT ".length())));
                     } else if (line.startsWith("LUMIVERSE_ANDROID_BACKEND_EXITED ")) {
                         if (!destroyed) listener.failed("Local server stopped. Reopen Lumiverse to resume any interrupted restore.");
+                    } else if (line.startsWith("LUMIVERSE_ANDROID_BACKEND_FAILED ")) {
+                        if (!destroyed) listener.failed(line.substring("LUMIVERSE_ANDROID_BACKEND_FAILED ".length()));
                     } else {
                         synchronized (output) {
                             output.append(line).append('\n');

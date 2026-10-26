@@ -151,7 +151,7 @@ process.dlopen(module, join(directory, '${library}'));
     cpSync(join(backendRoot(), "src"), join(app, "src"), { recursive: true,
       filter: path => !/\.(test|spec)\.[cm]?[jt]sx?$/.test(path) && !["test-fixtures", "__tests__"].includes(path.split(sep).at(-1)!) });
     mkdirSync(join(app, "android"), { recursive: true });
-    for (const name of ["runtime.ts", "import-protocol.ts", "setup.ts", "index.html", "diagnostics.html", "fonts.conf", "lance-writer.ts", "lance-concurrency.ts", "ffmpeg-check.ts", "git-check.ts"])
+    for (const name of ["runtime.ts", "hosting.ts", "import-protocol.ts", "setup.ts", "index.html", "diagnostics.html", "fonts.conf", "lance-writer.ts", "lance-concurrency.ts", "ffmpeg-check.ts", "git-check.ts"])
       copyFileSync(join(ROOT, "android", name), join(app, "android", name));
     cpSync(join(backendRoot(), "frontend/dist"), join(app, "frontend/dist"), { recursive: true });
     copyFileSync(join(backendRoot(), "frontend/package.json"), join(app, "frontend/package.json"));

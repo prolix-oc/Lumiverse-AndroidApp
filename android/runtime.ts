@@ -9,11 +9,13 @@ import { runMigrations } from "../src/db/migrate";
 import { hasConfiguredOwner } from "../src/runtime/bundle-setup";
 import { configureAndroidOwner } from "./setup";
 import { importActivityFromMessage, importCancellation } from "./import-protocol";
+import { androidListener } from "./hosting";
 
 const root = resolve(import.meta.dir, "..");
 const data = process.env.DATA_DIR;
 if (!data || !process.env.LUMIVERSE_ANDROID_TOKEN) throw new Error("Launch through the Android host");
 const token = process.env.LUMIVERSE_ANDROID_TOKEN;
+const listener = androidListener(process.env);
 delete process.env.LUMIVERSE_ANDROID_TOKEN;
 const checkDirectory = join(data, "prototype-checks");
 mkdirSync(checkDirectory, { recursive: true });
@@ -118,8 +120,8 @@ async function diagnostics() {
 
 async function launchBackend(input: Record<string, unknown>) {
   if (backendState === "starting" || backendState === "running") throw new Error("The backend is already starting or running");
-  // Reserve an available loopback port. Backend readiness is confirmed through private IPC.
-  const reservation = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } });
+  // Probe the requested interface/port before spawning; readiness still uses private IPC.
+  const reservation = Bun.listen({ hostname: listener.hostname, port: listener.port ?? 0, socket: { data() {} } });
   const port = reservation.port; reservation.stop(true);
   backendState = "starting"; backendUrl = ""; backendError = "";
   try {
@@ -130,7 +132,7 @@ async function launchBackend(input: Record<string, unknown>) {
   } catch (error) { backendState = "stopped"; throw error; }
   const readyToken = randomBytes(32).toString("hex");
   backendIpcToken = readyToken;
-  const childEnv = { ...process.env, PORT: String(port), LUMIVERSE_HOST: "127.0.0.1", FRONTEND_DIR: join(root, "frontend/dist"),
+  const childEnv = { ...process.env, PORT: String(port), LUMIVERSE_HOST: listener.hostname, FRONTEND_DIR: join(root, "frontend/dist"),
     LUMIVERSE_BUNDLE_READY_TOKEN: readyToken };
   try { backend = Bun.spawn([process.execPath, "--no-env-file", "--smol", join(root, "src/index.ts")], {
     cwd: root, env: childEnv, stdout: "pipe", stderr: "pipe",
@@ -196,7 +198,10 @@ const server = Bun.serve({ hostname: "127.0.0.1", port: 0, maxRequestBodySize: 8
 });
 console.log(`LUMIVERSE_ANDROID_READY http://127.0.0.1:${server.port}/#${token}`);
 // This process supervises the backend; the UI never waits for the probes.
-if (configured) void launchBackend({}).catch(error => { backendError = String(error.message || error); log(backendError); });
+if (configured) void launchBackend({}).catch(error => {
+  backendError = String(error.message || error); log(backendError);
+  console.log(`LUMIVERSE_ANDROID_BACKEND_FAILED ${backendError.replace(/[\r\n]/g, " ").slice(0, 1000)}`);
+});
 void diagnostics().catch(error => { log(String(error)); checking = false; });
 async function shutdown() {
   if (stopping) return; stopping = true;

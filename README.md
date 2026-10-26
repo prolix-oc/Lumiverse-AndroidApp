@@ -4,6 +4,34 @@ Tauri/Kotlin/Java host, embedded Bun runtime, Android native dependency builders
 and app verification tools. The APK supports local hosting and connecting to a
 remote Lumiverse server. Native sources keep their `android/` layout.
 
+## Remote access
+
+Create a local account with **Use this device**, then enable **Remote access** on
+the connection page or in the native app controls (Android Back at the first page,
+or hold two fingers). Choose a port from 1024–65535; the default is 7860. Other
+clients on the same network can use the displayed address and sign in with the
+local account. The backend listens on all IPv4 interfaces while enabled. HTTP
+connections are unencrypted; use a trusted network or a VPN.
+
+Remote access keeps the existing backend in a `specialUse` foreground service,
+with a persistent notification and **Stop server** action. **Close app** closes
+the frontend while leaving that server running. Turning remote access off
+restarts the backend on loopback and reconnects an open local frontend. Wait for
+backup restores to finish before changing the toggle. The port is remembered;
+remote access is off by default. System reclamation can restart an enabled
+service, but force-stop and reboot require reopening the app and enabling it again.
+
+Connect to Wi-Fi, Ethernet, or a VPN before enabling access. If the network
+addresses change, turn remote access off and on to refresh them. Android supplies
+the exact addresses to the backend's trusted-origin list because Bun cannot
+always enumerate interfaces on Android. Setup and diagnostics remain on loopback.
+
+Android Doze and manufacturer battery management can still interrupt access;
+**Battery settings** opens the system optimization list for users who need
+screen-off access. Hosting holds a partial wake lock and uses more battery. It
+does not bypass Doze. This app targets SDK 36; targeting SDK 37 will additionally
+require the Android 17 `ACCESS_LOCAL_NETWORK` runtime permission.
+
 ## Setup and build
 
 Use Bun 1.4.4, Node.js, Rust/rustup, Android Studio's JDK, Android SDK platform 36
@@ -43,7 +71,9 @@ UI process exit when the activity closes. A restore
 promotes it to a `dataSync` foreground service with progress, a cancel action, and
 a partial wake lock while processing. Waiting for a decryption ticket releases
 the wake lock. Returning through the notification selects local hosting and opens
-Data Portability. An idle, detached service stops after 30 seconds.
+Data Portability. An idle, detached service stops after 30 seconds when remote
+access is disabled. With remote access enabled, the server's foreground service
+also owns restore execution and displays a separate restore-progress notification.
 
 The backend persists account-scoped job records and retains an interrupted
 archive for an explicit **Resume import**. Resume replays merge operations,
@@ -69,6 +99,13 @@ background check destroys the activity and turns off the screen; the microphone
 check exercises refusal, Android permission approval, and recorded audio output.
 For headless audio checks, `--microphone-virtual-tone` mixes a generated tone with
 the granted live capture track so host microphone input can remain disabled.
+
+After provisioning a disposable emulator with the backend smoke test and an
+explicit `LUMIVERSE_ANDROID_TEST_PASSWORD`, run
+`bun run scripts/smoke-test-android-remote-access.ts --serial emulator-PORT` with
+the same password. It verifies the network address, remote login and WebSocket,
+frontend close with the screen off beyond the idle timeout, turning access off,
+the native toggle, and the notification's stop action.
 
 ## Remote notifications
 

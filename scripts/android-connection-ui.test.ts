@@ -10,16 +10,19 @@ afterEach(() => { for (const dom of windows.splice(0)) dom.window.close() })
 
 async function fixture(info: object, query = '?changeServer=1') {
   let reject!: (error: Error) => void
-  const connecting = new Promise<void>((_, no) => { reject = no })
-  const invoke = mock((_: string, args: { action: string }) => args.action === 'info' ? Promise.resolve(info) : args.action === 'forget' ? Promise.resolve({ history: [] }) : connecting)
-  const dom = new JSDOM(html, { url: `http://tauri.localhost/index.html${query}`, runScripts: 'outside-only' })
+  let resolve!: () => void
+  const connecting = new Promise<void>((yes, no) => { resolve = yes; reject = no })
+  const invoke = mock((_: string, args: { action: string }) => args.action === 'info' ? Promise.resolve(info)
+    : args.action === 'remote-access-info' ? Promise.resolve((info as { remoteAccess?: object }).remoteAccess || { enabled: false })
+    : args.action === 'forget' ? Promise.resolve({ history: [] }) : connecting)
+  const dom = new JSDOM(html, { url: `http://tauri.localhost/index.html${query}`, runScripts: 'outside-only', pretendToBeVisual: true })
   windows.push(dom)
   Object.assign(dom.window, { __TAURI_INTERNALS__: { invoke } })
   dom.window.eval(`(() => {${script}})()`)
   await flush()
   const element = <T extends HTMLElement>(id: string) => dom.window.document.getElementById(id) as T
   const submit = () => element('connection-form').dispatchEvent(new dom.window.Event('submit', { cancelable: true, bubbles: true }))
-  return { dom, invoke, reject, element, submit }
+  return { dom, invoke, reject, resolve, element, submit }
 }
 async function flush() { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() }
 
@@ -58,6 +61,42 @@ test('startup still restores the remote or local mode, and empty history is usab
     expect(page.invoke).toHaveBeenLastCalledWith('mobile_connection', { action: mode, server: 'https://saved.example/' })
     expect(page.element('history-empty').hidden).toBe(false)
   }
+})
+
+test('remote access starts only when toggled, shows live addresses, and can close the frontend', async () => {
+  const info = { port: 8123, remoteAccess: { enabled: false, ready: false, port: 8123, urls: [] as string[] } }
+  const page = await fixture(info)
+  expect(page.invoke).toHaveBeenCalledTimes(1)
+  page.element<HTMLInputElement>('remote-enabled').click()
+  expect(page.invoke).toHaveBeenLastCalledWith('mobile_connection', { action: 'remote-on', server: null, port: 8123 })
+  expect(page.element<HTMLInputElement>('remote-enabled').disabled).toBe(true)
+  info.remoteAccess = { enabled: true, ready: true, port: 8123, urls: ['http://192.168.1.50:8123'] }
+  page.resolve()
+  await flush(); await flush()
+  expect(page.element('remote-status').textContent).toContain('http://192.168.1.50:8123')
+  expect(page.element<HTMLInputElement>('remote-port').disabled).toBe(true)
+  expect(page.element('close-frontend').hidden).toBe(false)
+  page.element<HTMLButtonElement>('close-frontend').click()
+  expect(page.invoke).toHaveBeenLastCalledWith('mobile_connection', { action: 'close', server: null })
+  page.element<HTMLInputElement>('remote-enabled').click()
+  expect(page.invoke).toHaveBeenLastCalledWith('mobile_connection', { action: 'remote-off', server: null })
+})
+
+test('remote access rejects invalid ports before IPC and restores confirmed state after failure', async () => {
+  const page = await fixture({ remoteAccess: { enabled: false } })
+  for (const value of ['', '80', '65536', '7860.5']) {
+    page.element<HTMLInputElement>('remote-port').value = value
+    page.element<HTMLInputElement>('remote-enabled').click()
+    expect(page.invoke).toHaveBeenCalledTimes(1)
+    expect(page.element<HTMLInputElement>('remote-enabled').checked).toBe(false)
+  }
+  page.element<HTMLInputElement>('remote-port').value = '7860'
+  page.element<HTMLInputElement>('remote-enabled').click()
+  page.reject(new Error('Port 7860 is unavailable. Choose another port.'))
+  await flush(); await flush()
+  expect(page.element<HTMLInputElement>('remote-enabled').checked).toBe(false)
+  expect(page.element<HTMLInputElement>('remote-port').disabled).toBe(false)
+  expect(page.element('status').textContent).toContain('Port 7860 is unavailable')
 })
 
 const readyScript = readFileSync(new URL('../android/tauri/src-tauri/src/connection-ready.js', import.meta.url), 'utf8')

@@ -112,7 +112,8 @@ async function start() {
         const ready = await evaluate<boolean>(`(() => {
           const local = document.getElementById('local');
           if (local && window.__TAURI_INTERNALS__) {
-            if (!local.disabled) local.click();
+            if (local.disabled) return false;
+            local.click();
             return true;
           }
           return location.hostname === '127.0.0.1' && document.readyState !== 'loading';

@@ -9,16 +9,17 @@ async fn mobile_connection(
     app: tauri::AppHandle,
     action: String,
     server: Option<String>,
+    port: Option<u32>,
 ) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "android")]
     {
         use tauri::Manager;
         app.state::<RuntimeHandle>().0.run_mobile_plugin(
-            "connection", serde_json::json!({ "action": action, "server": server }),
+            "connection", serde_json::json!({ "action": action, "server": server, "port": port }),
         ).map_err(|error| error.to_string())
     }
     #[cfg(not(target_os = "android"))]
-    { let _ = (app, action, server); Err("Android connection controls are unavailable".into()) }
+    { let _ = (app, action, server, port); Err("Android connection controls are unavailable".into()) }
 }
 
 #[tauri::command]

@@ -46,8 +46,12 @@ export async function checkAndroidBackgroundRestore(evaluate: Evaluate, command:
     assert.doesNotMatch((await power()).split("Wake Locks:")[1]?.split("Suspend Blockers:")[0] || "", /Lumiverse::BackupRestore/, "Waiting for a ticket must release the wake lock");
 
     // Exercise the app's real Close app action, which calls Activity.finish().
-    await command("shell", "input", "keyevent", "KEYCODE_BACK");
-    await tapAndroidControl(command, /text="Close app"/i);
+    // Back may first dismiss the keyboard or navigate through login history.
+    for (let attempt = 0; ; attempt++) {
+      await command("shell", "input", "keyevent", "KEYCODE_BACK");
+      try { await tapAndroidControl(command, /text="Close app"/i); break; }
+      catch (error) { if (attempt >= 3) throw error; }
+    }
     await command("shell", "input", "keyevent", "KEYCODE_SLEEP");
     await wait(async () => !/ConnectionRecord/.test(await services()), "activity unbind");
     assert.match(await power(), /mWakefulness=Asleep/, "The screen must actually be off");
