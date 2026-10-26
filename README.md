@@ -35,6 +35,35 @@ caches live in `.tmp/android-native`. The legacy Termux/glibc builder and its
 patches live in `scripts/build-lancedb-android.sh` and `vendor/lancedb-android`;
 they are separate from the APK's Android NDK build.
 
+## Remote notifications
+
+Official builds use `android/firebase/google-services.json` for Firebase project
+`lumiverse-bc911`, retaining application ID `chat.lumiverse.prototype`. Remote
+backends default to the Lumiverse FCM relay without receiving Firebase provider
+credentials. The relay must be deployed before releasing these clients. Users
+still enable notifications explicitly; local hosting keeps its notification-only
+socket and needs no Firebase secrets.
+
+An operator can build with
+`LUMIVERSE_ANDROID_FIREBASE_CONFIG=/path/to/google-services.json` to override the
+bundled client configuration, then configure matching direct FCM credentials on
+their backend. Provider private keys never belong in this repository or APK.
+Firebase-project changes renew notification enrollment. Keep the existing
+signing key, package and version-code continuity to preserve installed user data.
+
+Relay enrollment verifies device possession through FCM and uses separate
+delivery/management capabilities. Content keys and native capabilities are wrapped
+with Android Keystore. Both new direct and relay enrollments decrypt authenticated
+alerts before using the existing native renderer. Server/account switches clear
+the active context immediately; background completion alerts do not depend on a
+running WebView. Force-stop still blocks receipt until the app is reopened.
+
+The backend changes must be adopted together with this APK. Update
+`backend-source.json` after those changes have a committed revision; the private
+nightly controller already builds current backend `staging`. Before rollout,
+verify live Firebase delivery and an in-place upgrade over a populated existing
+install using the same signing certificate.
+
 ## Verify
 
 ```sh

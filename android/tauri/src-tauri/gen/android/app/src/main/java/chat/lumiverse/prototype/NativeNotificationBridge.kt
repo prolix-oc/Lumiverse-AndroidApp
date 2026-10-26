@@ -48,9 +48,11 @@ class NativeNotificationBridge(private val activity: MainActivity, private val v
                             reply(true)
                         }
                         "notifications.register" -> activity.requestNotificationPermission { granted ->
-                            if (granted && selected == requestOrigin) NativeNotifications.register(activity) { result, error -> reply(result, error) }
+                            if (granted && selected == requestOrigin) NativeNotifications.register(activity, payload) { result, error -> reply(result, error) }
                             else reply(null)
                         }
+                        "notifications.poll" -> FCMRelayEnrollment.poll(activity, payload.getString("enrollmentId")) { result, error -> reply(result, error) }
+                        "notifications.cancel" -> { FCMRelayEnrollment.cancelPending(activity, payload.optString("enrollmentId").takeIf { it.isNotBlank() }); reply(true) }
                         "notifications.current" -> reply(NativeNotifications.current(activity, payload))
                         "notifications.save" -> { NativeNotifications.save(activity, payload); reply(true) }
                         "notifications.clear" -> {

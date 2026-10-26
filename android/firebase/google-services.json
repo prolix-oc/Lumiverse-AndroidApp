@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "255433534703",
+    "project_id": "lumiverse-bc911",
+    "storage_bucket": "lumiverse-bc911.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:255433534703:android:eecf75068d76ef7844bf1a",
+        "android_client_info": {
+          "package_name": "chat.lumiverse.prototype"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDdv-gkOBE8Tg9c1uVkrhy-KoXoin3Qc8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

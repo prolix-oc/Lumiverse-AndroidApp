@@ -40,6 +40,7 @@ object NativeNotifications {
     fun account(context: Context): String? = prefs(context).getString("accountId", null)
     fun origin(raw: String?): String? = NotificationPolicy.origin(raw)
     fun clear(context: Context) {
+        FCMRelayEnrollment.clear(context)
         prefs(context).edit().remove("enrollment").commit()
         LocalNotificationTransport.stop()
         NotificationManagerCompat.from(context).cancelAll()
@@ -72,6 +73,7 @@ object NativeNotifications {
         val current = enrollment(context)
         return JSONObject().apply {
             put("available", local || app != null)
+            put("relayAvailable", true); put("encryptionVersion", 1); put("packageName", context.packageName)
             put("permission", permission(context)); put("deviceId", deviceId(context))
             put("transport", if (local) "local" else "fcm")
             put("projectId", app?.options?.projectId ?: JSONObject.NULL)
@@ -82,16 +84,24 @@ object NativeNotifications {
             } } ?: JSONObject.NULL)
         }
     }
-    fun register(context: Context, reply: (JSONObject?, String?) -> Unit) {
+    fun register(context: Context, options: JSONObject, reply: (JSONObject?, String?) -> Unit) {
         if (permission(context) != "granted") { reply(null, null); return }
         val value = JSONObject().put("deviceId", deviceId(context)).put("accountId", account(context)).put("transport", if (isLocal(context)) "local" else "fcm")
         if (isLocal(context)) { reply(value, null); return }
         val app = firebase(context) ?: run { reply(null, "Firebase client configuration is unavailable."); return }
+        val requestedOrigin = selectedOrigin(context)
+        val requestedAccount = account(context)
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (selectedOrigin(context) != requestedOrigin || account(context) != requestedAccount) {
+                reply(null, "The selected server or account changed."); return@addOnCompleteListener
+            }
             if (!task.isSuccessful) reply(null, "Could not register with Google Play services. Check connectivity and try again.")
             else {
                 prefs(context).edit().putString("fcmToken", task.result).apply()
-                reply(value.put("deviceToken", task.result).put("projectId", app.options.projectId), null)
+                if (options.optInt("encryptionVersion") == 1) {
+                    try { FCMRelayEnrollment.begin(context, task.result, options, reply) }
+                    catch (error: Exception) { reply(null, error.message ?: "Notification registration failed.") }
+                } else reply(value.put("deviceToken", task.result).put("projectId", app.options.projectId), null)
             }
         }
     }
@@ -111,7 +121,10 @@ object NativeNotifications {
             put("credential", input.getString("credential")); put("transport", destination.getString("transport"))
             put("deviceToken", input.optString("deviceToken", ""))
         }
-        clear(context)
+        if (!local && input.optString("enrollmentId").isNotBlank()) stored.put("enrollmentId", input.getString("enrollmentId"))
+        FCMRelayEnrollment.activate(context, input)
+        LocalNotificationTransport.stop()
+        NotificationManagerCompat.from(context).cancelAll()
         prefs(context).edit().putString("enrollment", stored.toString()).commit()
         if (local) LocalNotificationTransport.start(context.applicationContext, stored)
     }
@@ -120,7 +133,8 @@ object NativeNotifications {
         val matches = value.optString("destinationId") == input.optString("destinationId")
             && value.optString("serverInstanceId") == input.optString("serverInstanceId")
             && value.optString("serverOrigin") == selectedOrigin(context) && value.optString("accountId") == account(context)
-            && (isLocal(context) || value.optString("deviceToken") == input.optString("deviceToken"))
+            && (isLocal(context) || if (input.optString("enrollmentId").isNotBlank()) FCMRelayEnrollment.current(context, input)
+                else value.optString("enrollmentId").isBlank() && value.optString("deviceToken") == input.optString("deviceToken"))
         if (matches && isLocal(context) && !LocalNotificationTransport.running) LocalNotificationTransport.start(context.applicationContext, value)
         return matches
     }
@@ -129,7 +143,12 @@ object NativeNotifications {
         NativeNotificationBridge.emit("lumiverse:android-push-token")
     }
     fun receive(context: Context, data: Map<String, String>) {
+        data["relayChallenge"]?.let { FCMRelayEnrollment.challenge(context, it); return }
         val current = enrollment(context) ?: return
+        if (current.optString("enrollmentId").isNotBlank()) {
+            FCMRelayEnrollment.decrypt(context, data, current)?.let { present(context, it, current) }
+            return
+        }
         if (current.optString("transport") != "fcm" || data["destinationId"] != current.optString("destinationId")
             || data["serverOrigin"] != current.optString("serverOrigin") || data["serverInstanceId"] != current.optString("serverInstanceId")) return
         val raw = data["payload"] ?: return

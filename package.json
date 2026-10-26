@@ -22,7 +22,7 @@
     "test": "bun run test:unit",
     "test:backend": "bun run scripts/test-android-setup.ts",
     "typecheck": "tsc --noEmit",
-    "test:unit": "bun test --isolate scripts android/notification-policy.test.ts android/server-address.test.ts",
+    "test:unit": "bun test --isolate scripts android/notification-policy.test.ts android/notification-encryption.test.ts android/server-address.test.ts",
     "test:ci": "bun run typecheck && bun run test:unit && bun run test:backend"
   },
   "dependencies": {

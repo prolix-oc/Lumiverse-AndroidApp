@@ -28,8 +28,10 @@ require((nightlyVersionCode == null) == (nightlyVersionName == null)) {
 }
 
 // Optional client configuration. Provider/service-account keys never enter the APK.
-val firebaseConfig = System.getenv("LUMIVERSE_ANDROID_FIREBASE_CONFIG")?.let { path ->
-    JsonSlurper().parse(file(path)) as Map<*, *>
+val firebaseConfigFile = System.getenv("LUMIVERSE_ANDROID_FIREBASE_CONFIG")?.let { file(it) }
+    ?: file("../../../../../firebase/google-services.json")
+val firebaseConfig = firebaseConfigFile.takeIf { it.isFile }?.let {
+    JsonSlurper().parse(it) as Map<*, *>
 }
 
 android {
