@@ -18,8 +18,11 @@ test('Android JVM decrypts the backend FCM wire format and rejects altered routi
     const clear = JSON.stringify({ title: 'Alice 🦊', body: 'Private response ready', accountId: 'owner' })
     const cipher = createCipheriv('aes-256-gcm', key, nonce); cipher.setAAD(Buffer.from(aad))
     const ciphertext = Buffer.concat([cipher.update(clear, 'utf8'), cipher.final()])
+    // Keep argv ASCII even when the Linux build container uses the C locale.
+    // The fixture decodes the expected Unicode text explicitly as UTF-8.
     const run = Bun.spawnSync([join(jdk, 'bin/java'), '-cp', output, 'chat.lumiverse.prototype.NotificationEncryptionCheck',
-      key.toString('base64'), nonce.toString('base64'), ciphertext.toString('base64'), cipher.getAuthTag().toString('base64'), ...fields, aad, clear])
+      key.toString('base64'), nonce.toString('base64'), ciphertext.toString('base64'), cipher.getAuthTag().toString('base64'), ...fields, aad, Buffer.from(clear, 'utf8').toString('base64')],
+      { env: { ...process.env, LANG: 'C', LC_ALL: 'C' } })
     expect(run.stderr.toString()).toBe(''); expect(run.exitCode).toBe(0)
   } finally { rmSync(output, { recursive: true, force: true }) }
 })
