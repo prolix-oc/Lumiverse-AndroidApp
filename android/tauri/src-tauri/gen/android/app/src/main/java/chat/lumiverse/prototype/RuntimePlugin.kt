@@ -337,13 +337,14 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
     private fun showControls() {
         if (controls?.isShowing == true || activity.isFinishing) return
         controls = AlertDialog.Builder(activity).setTitle("Lumiverse")
-            .setItems(arrayOf("Reload", "Change server", "Connection history", "Remote access", "Close app")) { _, which ->
+            .setItems(arrayOf("Reload", "Change server", "Connection history", "Remote access", "Check for app updates", "Close app")) { _, which ->
                 when (which) {
                     0 -> webView?.reload()
                     1 -> showConnectionPage()
                     2 -> showConnectionPage(history = true)
                     3 -> showRemoteAccess()
-                    4 -> activity.finish()
+                    4 -> (activity as? MainActivity)?.appUpdates?.check(manually = true)
+                    5 -> activity.finish()
                 }
             }.setNegativeButton("Cancel", null).show()
     }

@@ -18,6 +18,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
+  val appUpdates by lazy { AppUpdateChecker(this) }
   val filePicker = NativeFilePicker(this)
   var connectionWebView: WebView? = null
   var nativeActive = false
@@ -86,8 +87,13 @@ class MainActivity : TauriActivity() {
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent); setIntent(intent); notificationNavigation?.invoke()
   }
-  override fun onResume() { super.onResume(); nativeActive = true; notificationBridge?.resume(); notificationNavigation?.invoke() }
+  override fun onResume() { super.onResume(); nativeActive = true; notificationBridge?.resume(); notificationNavigation?.invoke(); appUpdates.resume() }
+  override fun onWindowFocusChanged(hasFocus: Boolean) {
+    super.onWindowFocusChanged(hasFocus)
+    if (hasFocus) appUpdates.presentPending()
+  }
   override fun onPause() {
+    appUpdates.pause()
     nativeActive = false
     notificationBridge?.lifecycle(false)
     CookieManager.getInstance().flush()
@@ -97,6 +103,7 @@ class MainActivity : TauriActivity() {
     if (ConnectionSessionService.active && !isFinishing) connectionWebView?.onResume()
   }
   override fun onDestroy() {
+    appUpdates.destroy()
     ConnectionSessionService.onFailure = null
     ConnectionSessionService.onClose = null
     ConnectionSessionService.stop(this)

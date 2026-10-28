@@ -234,3 +234,22 @@ resetting app data. CI sets `LUMIVERSE_ANDROID_VERSION_CODE` and
 `LUMIVERSE_ANDROID_VERSION_NAME` together; local builds retain Tauri versioning.
 The private controller owns the schedule, SDK/NDK/Java/Rust container, caches and
 release credentials. No public pull-request workflow uses the private runner.
+
+The APK checks public Android nightly releases when opened and hourly while in
+the foreground. Both scheduled and manually triggered builds are detected by
+their Android version code, even when the base app version or source commits
+have not changed. A native **Android app update available** prompt opens the
+official release page with **View update**. Download its APK and install it over
+the existing app to keep your data. Downloads and installation require user action.
+
+Choose **Later** to defer that build's prompt for 24 hours; a newer build can
+notify immediately. Use **Check for app updates** in the native controls (Android
+Back at the first page, or hold two fingers) to check again at any time. Failed
+automatic checks are quiet and retry after five minutes while the app is open.
+Checks pause in the background and resume when the app is opened again.
+
+These checks belong to the Android APK and also work on the connection chooser,
+with local hosting, or while connected to a hosted server. They use the public
+GitHub releases API without a token or backend account. Browser, desktop and iOS
+clients do not run this checker. Existing APKs need an initial manual upgrade to
+a build containing this feature before they can show update prompts.
