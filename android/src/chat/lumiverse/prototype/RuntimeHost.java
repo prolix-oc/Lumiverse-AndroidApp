@@ -66,6 +66,18 @@ public final class RuntimeHost {
     private AssetManager getAssets() { return context.getAssets(); }
     private ApplicationInfo getApplicationInfo() { return context.getApplicationInfo(); }
 
+    /** A changing origin loses WebView localStorage/IndexedDB even though account data survives. */
+    private int localPort() throws IOException {
+        android.content.SharedPreferences preferences = context.getSharedPreferences("lumiverse-runtime", Context.MODE_PRIVATE);
+        int port = preferences.getInt("local-port", 0);
+        if (port >= 1024 && port <= 65535) return port;
+        try (java.net.ServerSocket reservation = new java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))) {
+            port = reservation.getLocalPort();
+        }
+        if (!preferences.edit().putInt("local-port", port).commit()) throw new IOException("Could not save the local server address.");
+        return port;
+    }
+
     private static String hex(byte[] bytes) {
         StringBuilder result = new StringBuilder();
         for (byte value : bytes) result.append(String.format("%02x", value & 255));
@@ -153,6 +165,7 @@ public final class RuntimeHost {
             Map<String, String> env = builder.environment();
             env.put("DATA_DIR", data.getAbsolutePath());
             env.put("LUMIVERSE_ANDROID_HOST", host);
+            env.put("LUMIVERSE_ANDROID_LOCAL_PORT", Integer.toString(localPort()));
             if (listenPort != 0) {
                 env.put("LUMIVERSE_ANDROID_LISTEN_PORT", Integer.toString(listenPort));
                 // Android can deny Bun's getifaddrs(); native LinkProperties supplies exact origins.

@@ -7,6 +7,8 @@ import android.app.AlertDialog
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.widget.TextView
+import android.webkit.WebView
+import android.webkit.CookieManager
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import android.view.View
@@ -16,6 +18,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
+  val filePicker = NativeFilePicker(this)
+  var connectionWebView: WebView? = null
   var nativeActive = false
   var notificationBridge: NativeNotificationBridge? = null
   var notificationNavigation: (() -> Unit)? = null
@@ -83,8 +87,21 @@ class MainActivity : TauriActivity() {
     super.onNewIntent(intent); setIntent(intent); notificationNavigation?.invoke()
   }
   override fun onResume() { super.onResume(); nativeActive = true; notificationBridge?.resume(); notificationNavigation?.invoke() }
-  override fun onPause() { nativeActive = false; notificationBridge?.lifecycle(false); super.onPause() }
+  override fun onPause() {
+    nativeActive = false
+    notificationBridge?.lifecycle(false)
+    CookieManager.getInstance().flush()
+    super.onPause()
+    // WryActivity pauses the WebView here, even with an ongoing connection.
+    // Keep its media/JS running; native presence above must still say background.
+    if (ConnectionSessionService.active && !isFinishing) connectionWebView?.onResume()
+  }
   override fun onDestroy() {
+    ConnectionSessionService.onFailure = null
+    ConnectionSessionService.onClose = null
+    ConnectionSessionService.stop(this)
+    connectionWebView = null
+    filePicker.destroy()
     microphoneReply?.invoke(false); microphoneReply = null
     exportDirectoryReply?.invoke(null, "The app is closing."); exportDirectoryReply = null
     exportDirectoryDialog?.dismiss(); exportDirectoryDialog = null

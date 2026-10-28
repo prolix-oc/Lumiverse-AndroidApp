@@ -54,7 +54,7 @@ export async function checkAndroidBackgroundRestore(evaluate: Evaluate, command:
     }
     await command("shell", "input", "keyevent", "KEYCODE_SLEEP");
     await wait(async () => !/ConnectionRecord/.test(await services()), "activity unbind");
-    assert.match(await power(), /mWakefulness=Asleep/, "The screen must actually be off");
+    await wait(async () => /mWakefulness=(?:Asleep|Dozing)/.test(await power()), "screen off");
     assert.match(await services(), /isForeground=true/, "Foreground work must outlive the activity");
     assert.equal((await status()).status, "awaiting_ticket");
     const skipped = await request(`/api/v1/user-data/import/${jobId}/skip-ticket`, { method: "POST" });

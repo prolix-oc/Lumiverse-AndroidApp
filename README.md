@@ -4,6 +4,41 @@ Tauri/Kotlin/Java host, embedded Bun runtime, Android native dependency builders
 and app verification tools. The APK supports local hosting and connecting to a
 remote Lumiverse server. Native sources keep their `android/` layout.
 
+## Background connections
+
+Opening a local or hosted connection starts an **Active connections** foreground
+service in the WebView process. It keeps a partial wake lock and leaves the
+WebView resumed when switching apps or locking the screen, so generation tokens
+and TTS can continue. The notification's **Close app** action ends this protection;
+returning to the connection chooser also releases it. Backup restores and remote
+hosting retain their separate service lifetimes.
+Allow Android notifications to see the connection notification and its action.
+The native **Close app** control also ends the session when notifications are blocked.
+
+The matching backend frontend keeps heartbeats, token subscriptions and reconnects
+active for protected Android sessions while still reporting background presence.
+Hosted servers need that frontend update too. Force-stop, reboot, network outages
+and manufacturer/Doze restrictions still require recovery. Keeping a connection
+active uses more battery.
+
+Device-only hosting remembers its private loopback port so restarting the app
+preserves browser storage for extensions. A port conflict reports a startup
+failure rather than silently choosing a new origin. This does not migrate storage
+from older random ports or across explicit remote-hosting port changes.
+
+Run the real-client background regression on an explicitly selected disposable
+emulator with a test APK installed:
+
+```sh
+LUMIVERSE_BACKEND_DIR=/path/to/Lumiverse bun scripts/smoke-test-android-background-session.ts --serial emulator-5554 --seconds 180 --report .tmp/background-session.json
+```
+
+It checks Home and screen-off playback, live tokens, heartbeat, reconnect after a
+server-side disconnect, quiet-session process reclamation, repeated picker cancel
+and reopen, and notification/wake-lock release. DevTools is disconnected throughout
+each background interval. `--baseline` records the old APK's behavior without
+requiring protection to pass.
+
 ## Remote access
 
 Create a local account with **Use this device**, then enable **Remote access** on
@@ -97,6 +132,11 @@ The device smoke test accepts `--background-restore` and `--microphone` alongsid
 and `LUMIVERSE_ANDROID_TEST_PASSWORD` for an existing `prototypecheck` account. The
 background check destroys the activity and turns off the screen; the microphone
 check exercises refusal, Android permission approval, and recorded audio output.
+Add `--background-connection` to verify the real embedded backend remains reachable
+for 90 seconds with its screen off and survives quiet-session process reclamation.
+This also checks the stable browser origin, committed browser storage and backend
+settings across restart. The remote-access smoke checks those storage paths on a
+hosted origin across **Close app** and reopen and accepts `--report path.json`.
 For headless audio checks, `--microphone-virtual-tone` mixes a generated tone with
 the granted live capture track so host microphone input can remain disabled.
 

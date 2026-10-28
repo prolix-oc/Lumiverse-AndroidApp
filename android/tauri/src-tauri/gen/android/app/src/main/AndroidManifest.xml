@@ -28,6 +28,9 @@
         <service android:name=".LumiverseMessagingService" android:exported="false">
             <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
         </service>
+        <service android:name=".ConnectionSessionService" android:exported="false" android:foregroundServiceType="specialUse" android:stopWithTask="true">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Maintains a user-opened Lumiverse connection, its WebView audio and JavaScript, and its bound local server while switching apps or locking the screen. A persistent notification offers Close app; closing the frontend ends this service." />
+        </service>
         <service android:name=".RuntimeService" android:exported="false" android:process=":runtime" android:foregroundServiceType="dataSync|specialUse" android:stopWithTask="false">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started Lumiverse HTTP and WebSocket server for authenticated clients on the local network, with a persistent notification and Stop server action, including when the frontend is closed." />
         </service>

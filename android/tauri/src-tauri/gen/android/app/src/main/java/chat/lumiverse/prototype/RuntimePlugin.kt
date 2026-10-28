@@ -70,6 +70,14 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
         installControls(webView)
         downloads = NativeDownloads(activity, webView)
         (activity as? MainActivity)?.let {
+            it.connectionWebView = webView
+            ConnectionSessionService.onClose = { activity.finish() }
+            ConnectionSessionService.onFailure = { message ->
+                if (!activity.isFinishing && !activity.isDestroyed) {
+                    showConnectionPage()
+                    AlertDialog.Builder(activity).setTitle("Connection stopped").setMessage(message).setPositiveButton("OK", null).show()
+                }
+            }
             it.notificationBridge = NativeNotificationBridge(it, webView)
             it.notificationNavigation = { openPendingNotification() }
         }
@@ -107,6 +115,7 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
                     }
                     "remote" -> {
                         val server = ServerAddress.normalize(args.server)
+                        ConnectionSessionService.start(activity)
                         stopLocal()
                         preferences.edit().putString("mode", "remote").putString("server", server).apply()
                         invoke.resolve()
@@ -152,6 +161,7 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     private fun startLocal(invoke: Invoke?, remotePort: Int? = null, showFrontend: Boolean = true) {
+        if (showFrontend) ConnectionSessionService.start(activity)
         stopLocal()
         pendingLocal = invoke
         val attempt = localAttempt
@@ -318,6 +328,7 @@ class RuntimePlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     private fun showConnectionPage(history: Boolean = false) {
+        ConnectionSessionService.stop(activity)
         stopLocal()
         NativeNotifications.clear(activity)
         navigate("$launcherUrl?changeServer=1" + if (history) "&history=1" else "")

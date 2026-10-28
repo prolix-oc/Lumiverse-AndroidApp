@@ -10,6 +10,17 @@ The selected connection is saved for the next launch. Remote mode does not start
 the embedded backend. Switching modes preserves the on-device database; remote
 data remains on the selected server. HTTP connections are unencrypted.
 
+An active connection keeps running when you switch apps or lock the screen.
+Its **Lumiverse connection active** notification has a **Close app** action to
+end the session and release its battery protection. Closing the app stops its
+audio; an enabled remote server or ongoing backup restore can continue separately.
+Allow notifications to see that action; the native **Close app** control also works
+when notifications are blocked.
+Android power restrictions and network outages can still interrupt a session.
+Hosted servers need the updated frontend for background token delivery and
+reconnection. Device-only hosting now preserves its browser storage origin when
+restarting, which keeps extension browser settings on subsequent launches.
+
 To let other clients connect to this device's backend, enable **Remote access**
 on the connection page or in the native app controls. Create your local account
 first. Choose a port (7860 by default), then use the displayed network address

@@ -69,7 +69,8 @@ class NativeNotificationBridge(private val activity: MainActivity, private val v
     fun lifecycle(active: Boolean) {
         if (NativeNotifications.origin(view.url) != selected) return
         val state = if (active) "active" else "background"
-        view.evaluateJavascript("window.__LUMIVERSE_ANDROID_ACTIVE__=$active; window.dispatchEvent(new CustomEvent('lumiverse:android-app-state',{detail:{state:'$state'}}));", null)
+        val protected = ConnectionSessionService.active
+        view.evaluateJavascript("window.__LUMIVERSE_ANDROID_ACTIVE__=$active; window.__LUMIVERSE_ANDROID_BACKGROUND_CONNECTION__=$protected; window.dispatchEvent(new CustomEvent('lumiverse:android-app-state',{detail:{state:'$state'}}));", null)
     }
     fun resume() { lifecycle(true); emit("lumiverse:android-resume") }
     fun destroy() {

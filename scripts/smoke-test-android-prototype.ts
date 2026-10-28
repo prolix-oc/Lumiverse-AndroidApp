@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { checkAndroidBackupRestore } from "./android-backup-smoke";
 import { checkAndroidBackgroundRestore } from "./android-background-restore-smoke";
 import { checkAndroidMicrophone } from "./android-microphone-smoke";
+import { checkAndroidBackgroundConnection, waitForAndroidLocalFrontend } from "./android-background-connection-smoke";
 
 const args = process.argv.slice(2);
 const serialIndex = args.indexOf("--serial");
@@ -167,7 +168,7 @@ if (apk) {
   const manifest = await Bun.file(apk + ".json").json();
   assert.equal(updated.bundleId, manifest.payloadSha256, "Updated app must run the selected APK payload");
 }
-let backendAttempt: { state: string; output: string; http?: object; frontend?: object; backupRestore?: object; backgroundRestore?: object; microphone?: object; extensionInstall?: object; extensionInstalls?: object[]; automaticRelaunch?: boolean } | undefined;
+let backendAttempt: { state: string; output: string; http?: object; frontend?: object; persistence?: object; localBackground?: object; backupRestore?: object; backgroundRestore?: object; microphone?: object; extensionInstall?: object; extensionInstalls?: object[]; automaticRelaunch?: boolean } | undefined;
 if (args.includes("--attempt-backend")) {
   const testPassword = process.env.LUMIVERSE_ANDROID_TEST_PASSWORD || crypto.randomUUID() + crypto.randomUUID();
   const before = await runtimeStatus();
@@ -245,7 +246,7 @@ if (args.includes("--attempt-backend")) {
       assert.deepEqual(safeArea, { top: 0, bottom: 0 }, "Native bar padding must not also become CSS safe-area padding");
       backendAttempt.frontend = { automaticNavigation: "passed", entry, platform: "android", desktopIntegrations: "disabled", tauriBridge: "working", insets: { statusBarBottom, webViewTop, cssSafeArea: safeArea } };
       if (args.includes("--microphone")) backendAttempt.microphone = await checkAndroidMicrophone(expression => evaluate(expression, false, 15_000, true), command, args.includes("--microphone-virtual-tone"));
-      if (args.includes("--restore-backup") || args.includes("--background-restore") || args.includes("--install-extension")) {
+      if (args.includes("--restore-backup") || args.includes("--background-restore") || args.includes("--install-extension") || args.includes("--background-connection")) {
         assert.ok(!before.configured || process.env.LUMIVERSE_ANDROID_TEST_PASSWORD, "Set LUMIVERSE_ANDROID_TEST_PASSWORD for an existing prototypecheck account");
         assert.equal(await evaluate(`fetch('/api/auth/sign-in/username',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'prototypecheck',password:${JSON.stringify(testPassword)}})}).then(r=>r.status)`), 200);
         await evaluate("setTimeout(()=>location.reload(),50); true");
@@ -282,14 +283,32 @@ if (args.includes("--attempt-backend")) {
         }
       }
     }
+    const localOrigin = await waitForAndroidLocalFrontend(evaluate);
+    const storageProbe = crypto.randomUUID();
+    const settingPath = '/api/v1/settings/android-background-persistence-probe';
+    const verifySettings = args.includes("--require-tauri") && ["--restore-backup", "--background-restore", "--install-extension", "--background-connection"].some(flag => args.includes(flag));
+    if (verifySettings) assert.equal(await evaluate(`fetch(${JSON.stringify(settingPath)}, {method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({value:${JSON.stringify(storageProbe)}})}).then(r=>r.status)`), 200);
+    await evaluate(`localStorage.setItem('android-relaunch-persistence', ${JSON.stringify(storageProbe)}); true`);
+    // Chromium commits localStorage asynchronously. Verify committed storage,
+    // rather than treating a force-stop in the same turn as a flush primitive.
+    if (args.includes("--background-connection")) backendAttempt.localBackground = await checkAndroidBackgroundConnection(evaluate, command);
+    else await Bun.sleep(6000);
     await command("shell", "am", "force-stop", app);
     await start();
     const relaunched = await waitForStatus();
     assert.equal(relaunched.configured, true);
     assert.equal(relaunched.backendState, "running", "Configured installs must start the backend automatically");
     assert.equal(await evaluate(`location.origin===${JSON.stringify(new URL(relaunched.backendUrl).origin)} && !document.getElementById('checks') && !document.getElementById('setup')`), true);
+    assert.equal(await evaluate("location.origin"), localOrigin, "Restart must preserve the local browser storage origin");
+    assert.equal(await evaluate("localStorage.getItem('android-relaunch-persistence')"), storageProbe, "Extension browser storage must survive force-stop/relaunch");
+    if (verifySettings) {
+      assert.equal(await evaluate(`fetch(${JSON.stringify(settingPath)}).then(r=>r.json()).then(row=>row.value)`), storageProbe, "Backend settings must survive runtime restart");
+      assert.equal(await evaluate(`fetch(${JSON.stringify(settingPath)}, {method:'DELETE'}).then(r=>r.status)`), 200);
+    }
+    await evaluate("localStorage.removeItem('android-relaunch-persistence'); true");
+    backendAttempt.persistence = { stableBrowserOrigin: true, committedBrowserStorage: true, backendSettings: verifySettings ? true : "not requested" };
     if (args.includes("--require-tauri")) assert.equal(await evaluate("!!window.lumiverseNativeDownloads && !!window.lumiverseNotifications"), true,
-      "Native bridges must follow the backend's new port after a restart");
+      "Native bridges must be available after a restart");
     backendAttempt.automaticRelaunch = true;
   }
 }

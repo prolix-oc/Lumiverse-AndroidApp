@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.ActivityManager
 import android.content.Context
 import android.content.ComponentName
 import android.content.Intent
@@ -407,7 +408,15 @@ class RuntimeService : Service() {
         private const val HOST_NOTIFICATION = 23018
 
         /** Read live state across processes without starting an idle service or runtime. */
+        @Suppress("DEPRECATION") // Android still exposes the caller's own services for management UI.
         fun query(context: Context, reply: (JSONObject) -> Unit) {
+            fun idle() = JSONObject().put("enabled", false).put("ready", false).put("busy", false).put("urls", JSONArray())
+            // Binding without AUTO_CREATE can return true for a declared but stopped
+            // service and never connect. Avoid adding the full timeout to every cold
+            // connection page just to learn that remote hosting is off.
+            val running = context.getSystemService(ActivityManager::class.java).getRunningServices(Int.MAX_VALUE)
+                .any { it.service.className == RuntimeService::class.java.name }
+            if (!running) { reply(idle()); return }
             val handler = Handler(Looper.getMainLooper())
             var done = false
             var bound = false
@@ -419,7 +428,6 @@ class RuntimeService : Service() {
                 if (bound) context.unbindService(connection)
                 reply(state)
             }
-            fun idle() = JSONObject().put("enabled", false).put("ready", false).put("busy", false).put("urls", JSONArray())
             val client = Messenger(object : Handler(Looper.getMainLooper()) {
                 override fun handleMessage(message: Message) {
                     if (message.what == STATE) try { finish(JSONObject(message.data.getString("state") ?: "{}")) }

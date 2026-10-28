@@ -68,4 +68,17 @@ class NativeFileTypesTest {
         assertEquals("backup.zip", NativeFileTypes.downloadFilename("https://example.com/backup", null, "application/zip"))
         assertEquals("book.json", NativeFileTypes.downloadFilename("https://example.com/export", "attachment; filename=\"book.json\"", "application/json"))
     }
+
+    @Test fun backupAndMigrationPickersNeverPassUnknownExtensionsAsMimeTypes() {
+        for (types in arrayOf(arrayOf(".lvbak", ".zip", "application/zip", "application/octet-stream"),
+            arrayOf(".lumiverse"), arrayOf(".jsonl,.zip"), emptyArray())) {
+            val intent = NativeFileTypes.pickerIntent(params(types, multiple = true))
+            assertEquals("*/*", intent.type)
+            assertFalse(intent.hasExtra(Intent.EXTRA_MIME_TYPES))
+            assertTrue(intent.getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE, false))
+            assertTrue(intent.hasCategory(Intent.CATEGORY_OPENABLE))
+        }
+        assertEquals("application/zip", NativeFileTypes.pickerIntent(params(arrayOf(".zip", "application/zip"))).type)
+        assertEquals("application/json", NativeFileTypes.pickerIntent(params(arrayOf(".json", "application/json"))).type)
+    }
 }

@@ -3,9 +3,25 @@ package chat.lumiverse.prototype
 import android.content.Intent
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient.FileChooserParams
+import android.webkit.MimeTypeMap
 
 /** CHARX is a ZIP container with an extension Android's MIME map does not know. */
 internal object NativeFileTypes {
+    fun pickerIntent(params: FileChooserParams): Intent {
+        val types = params.acceptTypes.flatMap { it.split(',') }.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+            .map { if (it.startsWith('.')) MimeTypeMap.getSingleton().getMimeTypeFromExtension(it.substring(1)) ?: "*/*" else it }
+            .distinct()
+        val accepts = if (types.isEmpty() || "*/*" in types) listOf("*/*") else types
+        return params.createIntent().apply {
+            type = if (accepts.size == 1) accepts.single() else "*/*"
+            removeExtra(Intent.EXTRA_MIME_TYPES)
+            if (accepts.size > 1) putExtra(Intent.EXTRA_MIME_TYPES, accepts.toTypedArray())
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params.mode == FileChooserParams.MODE_OPEN_MULTIPLE)
+            addCategory(Intent.CATEGORY_OPENABLE)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
     fun importParams(params: FileChooserParams): FileChooserParams {
         val acceptsCharx = params.acceptTypes.any { value ->
             value.split(',').any { it.trim().equals(".charx", ignoreCase = true) }

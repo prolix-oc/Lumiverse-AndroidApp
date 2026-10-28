@@ -100,16 +100,19 @@ class NativeBrowserWindows(private val activity: Activity, private val main: Web
         main.webChromeClient = original
     }
 
-    // Preserve Wry's existing file chooser, permission, dialog, fullscreen and
-    // title handlers on the main view. Replacing them breaks unrelated features.
+    // Keep Wry's capture, permission, dialog, fullscreen and title handlers.
+    // MainActivity owns import callbacks so cancelled/failed launches cannot stick.
     private inner class Chrome(private val delegate: WebChromeClient?) : WebChromeClient() {
         override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message) = create(resultMsg)
         override fun onCloseWindow(window: WebView) { windows[window]?.dismiss() }
         override fun onReceivedTitle(view: WebView, title: String) { delegate?.onReceivedTitle(view, title) }
         override fun onProgressChanged(view: WebView, progress: Int) { delegate?.onProgressChanged(view, progress) }
         override fun onConsoleMessage(message: ConsoleMessage) = delegate?.onConsoleMessage(message) ?: false
-        override fun onShowFileChooser(view: WebView, reply: ValueCallback<Array<Uri>>, params: FileChooserParams) =
-            delegate?.onShowFileChooser(view, reply, NativeFileTypes.importParams(params)) ?: false
+        override fun onShowFileChooser(view: WebView, reply: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
+            if (delegate == null) return false
+            if (!params.isCaptureEnabled && activity is MainActivity) return activity.filePicker.open(reply, params)
+            return delegate.onShowFileChooser(view, reply, NativeFileTypes.importParams(params))
+        }
         override fun onPermissionRequest(request: PermissionRequest) {
             if (delegate != null && request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
                 if (microphone != null) microphone.request(request) else request.deny()
