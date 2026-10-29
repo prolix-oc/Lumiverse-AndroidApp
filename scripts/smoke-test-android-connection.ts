@@ -43,7 +43,13 @@ async function wait(expression: string, timeoutMs = 30000) {
   throw new Error(`Timed out: ${expression}`)
 }
 async function chooser() {
-  if (await evaluate("!!document.getElementById('connection-form')")) return
+  const ready = "!!document.getElementById('connection-form') && !document.getElementById('connect').disabled"
+  // A cold launch briefly shows this form before restoring its saved connection.
+  // Only the explicit Change server page stays open for a new selection.
+  if (await evaluate("new URLSearchParams(location.search).has('changeServer') && !!document.getElementById('connection-form')")) {
+    await wait(ready)
+    return
+  }
   for (let attempt = 0; attempt < 8; attempt++) {
     await command('shell', 'input', 'keyevent', '4')
     await command('shell', 'uiautomator', 'dump', '/sdcard/lumiverse-controls.xml')
@@ -51,7 +57,7 @@ async function chooser() {
     const bounds = xml.match(/text="Change server"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
     if (!bounds) continue
     await command('shell', 'input', 'tap', String((+bounds[1]! + +bounds[3]!) / 2), String((+bounds[2]! + +bounds[4]!) / 2))
-    await wait("!!document.getElementById('connection-form')")
+    await wait(ready)
     return
   }
   throw new Error('Native Change server control did not open')
