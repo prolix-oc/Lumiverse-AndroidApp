@@ -47,10 +47,14 @@ try {
   await run(device("shell", "chmod", "755", `${remote}/install-seccomp`));
   const prefix = ["shell", "env", `HOME=${remote}`, `TMPDIR=${remote}`, `BUN_INSTALL_CACHE_DIR=${remote}/cache`];
   const preload = `LD_PRELOAD=${installedCompat}`;
+  // The pinned Bun may already avoid these syscalls. Exercise a direct syscall
+  // probe as the negative control so a successful upstream install is valid.
+  const trapped = await run(device(...prefix, `${remote}/install-seccomp`, "probe"), true);
+  assert.equal(trapped.code, 159, "The unmodified probe must reproduce the seccomp SIGSYS trap");
   // cd is needed for Bun's project discovery; every interpolated path is generated here.
   const install = `cd ${remote} && ./install-seccomp exec ${bun} install --ignore-scripts --backend=copyfile`;
   const baseline = await run(device(...prefix, "sh", "-c", `'${install}'`), true);
-  assert.equal(baseline.code, 159, `The unmodified runtime must reproduce SIGSYS: ${JSON.stringify(baseline)}`);
+  assert.ok(baseline.code === 0 || baseline.code === 159, `Unexpected unmodified runtime failure: ${JSON.stringify(baseline)}`);
   await run(device("shell", "rm", "-rf", `${remote}/node_modules`));
   await run(device("shell", "mkdir", `${remote}/node_modules`));
   writeFileSync(join(staging, "outside.js"), "// Must remain outside the package and non-executable.\n", { mode: 0o644 });
@@ -65,7 +69,7 @@ try {
     assert.equal(result.code, 159, `Compatibility must preserve fatal SIGSYS for ${mode}`);
   }
   const report = { testedAt: new Date().toISOString(), serial, bun: bunVersion, trappedSyscalls: ["openat2", "fchmodat2"],
-    baselineExitCode: baseline.code, compatibilityExitCode: recovered.code, binExecutable: true, escapingBinRejected: true,
+    negativeControlExitCode: trapped.code, baselineExitCode: baseline.code, compatibilityExitCode: recovered.code, binExecutable: true, escapingBinRejected: true,
     signalForwarding: probe.stdout.trim(), otherSigsysRemainFatal: true, compatibilitySource: "installed-apk", compatibilitySha256: compat.sha256 };
   const reportIndex = args.indexOf("--report");
   if (reportIndex >= 0) await Bun.write(resolve(args[reportIndex + 1]!), JSON.stringify(report, null, 2) + "\n");

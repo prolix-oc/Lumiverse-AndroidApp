@@ -94,9 +94,10 @@ and `--java-home`. `build:android-prototype --prepare-only` prepares the verifie
 runtime payload without invoking the Tauri/Gradle build.
 
 Native dependency outputs live in `dist/native/android-arm64`; download/build
-caches live in `.tmp/android-native`. The legacy Termux/glibc builder and its
-patches live in `scripts/build-lancedb-android.sh` and `vendor/lancedb-android`;
-they are separate from the APK's Android NDK build.
+caches live in `.tmp/android-native`. For the GNU/glibc addon used by Termux
+through grun or PRoot, run `bun run build:lancedb:termux`. Its outputs live in
+`dist/native/termux-arm64` and its cache in `.tmp/termux-native`. See
+[Termux build instructions](vendor/lancedb-android/BUILDING.md) for prerequisites.
 
 ## Local backup restores
 
