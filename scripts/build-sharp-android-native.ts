@@ -82,7 +82,7 @@ for (const name of ["libwebp.so", "libwebpdemux.so", "libwebpmux.so", "libsharpy
 }
 const sharp = join(backendRoot(), "node_modules/sharp");
 const sharpVersion = (await Bun.file(join(sharp, "package.json")).json()).version;
-if (sharpVersion !== "0.34.5") throw new Error("Update the Android Sharp build pin.");
+if (sharpVersion !== "0.35.5") throw new Error("Update the Android Sharp build pin.");
 const out = join(root, "dist/native/android-arm64"); mkdirSync(out, { recursive: true });
 const binary = join(out, "libsharp.so");
 await run([join(llvm, "aarch64-linux-android29-clang++"), "-shared", "-fPIC", "-std=c++17", "-O2", "-fexceptions",
@@ -108,7 +108,10 @@ for (const notice of walkNativeNotices(join(prefix, "share/doc"))) {
   copyFileSync(notice.path, destination);
 }
 copyFileSync(join(root, "android/native/termux-aarch64.json"), join(notices, "termux-packages.json"));
-await Bun.write(join(out, "sharp.json"), JSON.stringify({ format: 1, version: sharpVersion, libvips: "8.18.7-1", target: "aarch64-linux-android", api: 29,
+await Bun.write(join(out, "sharp.json"), JSON.stringify({ format: 1, version: sharpVersion, libvips: "8.18.7-2", target: "aarch64-linux-android", api: 29,
+  packages: Object.fromEntries(lock.packages.map(pkg => [pkg.Package, pkg.Version])),
+  buildInputs: Object.fromEntries(["scripts/build-sharp-android-native.ts", "scripts/android-native.ts", "android/native/termux-aarch64.json"]
+    .map(path => [path, nativeSha256(readFileSync(join(root, path)))])),
   sha256: nativeSha256(readFileSync(binary)), webp: "1.6.0", modules: ["heif", "jxl"],
   libraries: libraries.map(({ name, sha256, sourceSha256, needed }) => ({ name, sha256, sourceSha256, needed })) }, null, 2) + "\n");
 console.log(`[android-native] Built ${binary}`);

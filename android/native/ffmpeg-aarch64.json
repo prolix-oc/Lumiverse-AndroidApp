@@ -4,9 +4,9 @@
   "packages": [
     {
       "Package": "brotli",
-      "Version": "1.2.0",
-      "Filename": "pool/main/b/brotli/brotli_1.2.0_aarch64.deb",
-      "SHA256": "db1502601d40fb44e6085ad8bfd9311a8b472e98db831ceec9d404c5708bb52c"
+      "Version": "1.2.1",
+      "Filename": "pool/main/b/brotli/brotli_1.2.1_aarch64.deb",
+      "SHA256": "4fba29438b2b44f8470d52173b4548e938542dc2fc632f8699be5a284cbb9485"
     },
     {
       "Package": "ffmpeg",
@@ -64,9 +64,9 @@
     },
     {
       "Package": "harfbuzz",
-      "Version": "14.6.0",
-      "Filename": "pool/main/h/harfbuzz/harfbuzz_14.6.0_aarch64.deb",
-      "SHA256": "eeeebc3cb1d10612ef5e53c1ecdf1b15f36889592e847d10774f350ba07ecf74"
+      "Version": "15.0.0",
+      "Filename": "pool/main/h/harfbuzz/harfbuzz_15.0.0_aarch64.deb",
+      "SHA256": "93462441eb08e32a2d79d237922fec4cd0773279e9138705e1d143362f8e6284"
     },
     {
       "Package": "highway",
@@ -202,9 +202,9 @@
     },
     {
       "Package": "libjpeg-turbo",
-      "Version": "3.2.0",
-      "Filename": "pool/main/libj/libjpeg-turbo/libjpeg-turbo_3.2.0_aarch64.deb",
-      "SHA256": "e6339075bcde28b4902d5a51f4063164834abfd2fa115e881ae637a34585e54f"
+      "Version": "3.2.1",
+      "Filename": "pool/main/libj/libjpeg-turbo/libjpeg-turbo_3.2.1_aarch64.deb",
+      "SHA256": "3e46721f2fbb10d5f53a45b99e2549d18a34ca3751aa4b704b3404fcdea5f8e7"
     },
     {
       "Package": "libjxl",
@@ -394,15 +394,15 @@
     },
     {
       "Package": "libwebp",
-      "Version": "1.6.0-rc1-0",
-      "Filename": "pool/main/libw/libwebp/libwebp_1.6.0-rc1-0_aarch64.deb",
-      "SHA256": "80fa46bec4faad0ccfd969df5acfd501d813ca9d112b5c49f3f91390e987f3a9"
+      "Version": "1.6.0.0.0.1+really1.6.0",
+      "Filename": "pool/main/libw/libwebp/libwebp_1.6.0.0.0.1+really1.6.0_aarch64.deb",
+      "SHA256": "8ba7fcfadd1a9957a7632c6407d6ef3e41d34dbd96a41769b245592ed4559045"
     },
     {
       "Package": "libx11",
-      "Version": "1.8.13-1",
-      "Filename": "pool/main/libx/libx11/libx11_1.8.13-1_aarch64.deb",
-      "SHA256": "a18c5cf3cfe2670bf1cb4243e3140a0b7639350a4175b5229c969402fdb12e9f"
+      "Version": "1.8.14",
+      "Filename": "pool/main/libx/libx11/libx11_1.8.14_aarch64.deb",
+      "SHA256": "c5206ee9cc26a63985d110b57bc24f23c7c97505e6100c4d6a8547a1aeed5532"
     },
     {
       "Package": "libx264",
@@ -448,9 +448,9 @@
     },
     {
       "Package": "libxrender",
-      "Version": "0.9.12-1",
-      "Filename": "pool/main/libx/libxrender/libxrender_0.9.12-1_aarch64.deb",
-      "SHA256": "90b21a4bc266468d540cab654ea7c010dcdd949b60d7136e87dad6966cef5cc0"
+      "Version": "0.9.13",
+      "Filename": "pool/main/libx/libxrender/libxrender_0.9.13_aarch64.deb",
+      "SHA256": "66b96ac572a9133836b638fb773b0dde4980541d9c49279a75a9ebace8f827c8"
     },
     {
       "Package": "libxshmfence",

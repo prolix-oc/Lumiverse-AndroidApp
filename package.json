@@ -26,8 +26,8 @@
     "test:ci": "bun run typecheck && bun run test:unit && bun run test:backend"
   },
   "dependencies": {
-    "fflate": "0.8.2",
-    "sharp": "0.34.5"
+    "fflate": "0.8.3",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.4",
@@ -35,7 +35,7 @@
     "bun-types": "1.4.4",
     "jsdom": "29.0.1",
     "typescript": "7.0.2",
-    "esbuild": "0.27.0"
+    "esbuild": "0.28.2"
   },
   "trustedDependencies": [
     "sharp"

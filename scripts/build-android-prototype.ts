@@ -85,7 +85,7 @@ async function build() {
     const git = await Bun.file(join(nativeDir, "git.json")).json();
     const ffmpegLock = await Bun.file(join(ROOT, "android/native/ffmpeg-aarch64.json")).json();
     const gitLock = await Bun.file(join(ROOT, "android/native/git-aarch64.json")).json();
-    if (sharp.version !== "0.34.5" || lance.version !== pkg.dependencies["@lancedb/lancedb"] ||
+    if (sharp.version !== "0.35.5" || lance.version !== pkg.dependencies["@lancedb/lancedb"] ||
         ffmpeg.version !== ffmpegLock.packages.find((entry: { Package: string }) => entry.Package === "ffmpeg")?.Version ||
         git.version !== gitLock.packages.find((entry: { Package: string }) => entry.Package === "git")?.Version ||
         sharp.target !== "aarch64-linux-android" || lance.target !== "aarch64-linux-android" || ffmpeg.target !== "aarch64-linux-android" || git.target !== "aarch64-linux-android")
@@ -122,7 +122,7 @@ async function build() {
       ...(offline ? ["--offline"] : [])], app);
     if (!runtimeOnly) {
       const stagedSharp = await Bun.file(join(app, "node_modules/sharp/package.json")).json();
-      if (stagedSharp.version !== "0.34.5") throw new Error("Update the Android Sharp build pin to match the installed package.");
+      if (stagedSharp.version !== "0.35.5") throw new Error("Update the Android Sharp build pin to match the installed package.");
       for (const [name, version, library] of [["@img/sharp-android-arm64", stagedSharp.version, "libsharp.so"],
         ["@lancedb/lancedb-android-arm64", pkg.dependencies["@lancedb/lancedb"], "liblancedb.so"]]) {
         const directory = join(app, "node_modules", name); mkdirSync(directory, { recursive: true });
@@ -187,7 +187,7 @@ process.dlopen(module, join(directory, '${library}'));
     await run([join(javaHome, "bin/jar"), "cf", jar, "-C", classes, "."]);
     const dex = join(staging, "dex"); mkdirSync(dex);
     await run([join(tools, "d8"), "--lib", androidJar, "--min-api", "29", "--output", dex, jar]);
-    const entries = unzipSync(readFileSync(base));
+    const entries: Record<string, Uint8Array> = unzipSync(readFileSync(base));
     entries["classes.dex"] = readFileSync(join(dex, "classes.dex"));
     entries["assets/payload.zip"] = payload;
     entries["assets/prototype.json"] = Buffer.from(JSON.stringify(manifest));
