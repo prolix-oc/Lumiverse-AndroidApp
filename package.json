@@ -18,6 +18,7 @@
     "build:sharp:android-native": "bun run scripts/build-sharp-android-native.ts",
     "test:android-prototype": "bun run scripts/smoke-test-android-prototype.ts",
     "build:lancedb:android": "bash scripts/build-lancedb-android.sh",
+    "build:lancedb:termux": "bun run scripts/build-lancedb-termux-native.ts",
     "build": "bun run build:android-tauri",
     "test": "bun run test:unit",
     "test:backend": "bun run scripts/test-android-setup.ts",

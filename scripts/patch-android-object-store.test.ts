@@ -23,13 +23,15 @@ function fixture(version: string) {
 }
 const helper = join(import.meta.dir, "../android/native/object-store-android.rs");
 
-for (const version of ["0.13.2", "0.14.2"]) {
-  test(`patches object_store ${version} without changing its upstream source or non-Android rename`, () => {
+for (const version of ["0.13.2", "0.14.2"]) for (const platform of ["android", "termux"] as const) {
+  test(`patches object_store ${version} for ${platform} without changing its upstream source or other platforms`, () => {
     const f = fixture(version);
-    const digest = patchAndroidObjectStore(f.upstream, f.destination, helper);
+    const digest = patchAndroidObjectStore(f.upstream, f.destination, helper, platform);
+    const targetOs = platform === "termux" ? "linux" : "android";
     const output = readFileSync(join(f.destination, "src/local.rs"), "utf8");
     expect(readFileSync(join(f.upstream, "src/local.rs"), "utf8")).toBe(f.source);
-    expect(output).toContain(`#[cfg(not(target_os = "android"))]\n                {${f.fallback}`);
+    expect(output).toContain(`#[cfg(not(target_os = "${targetOs}"))]\n                {${f.fallback}`);
+    expect(output).toContain(`#[cfg(target_os = "${targetOs}")]\nfn android_rename_noreplace`);
     expect(output).toContain("match android_rename_noreplace(&from, &to)");
     expect(output).toContain("ErrorKind::AlreadyExists => return Err(Error::AlreadyExists");
     expect(output).not.toContain("std::fs::hard_link(original, link)");
@@ -43,7 +45,7 @@ for (const version of ["0.13.2", "0.14.2"]) {
       expect(output).not.toContain("fsync_parent_dir(");
     }
     const modifiedAt = statSync(join(f.destination, "src/local.rs")).mtimeMs;
-    expect(patchAndroidObjectStore(f.upstream, f.destination, helper)).toBe(digest);
+    expect(patchAndroidObjectStore(f.upstream, f.destination, helper, platform)).toBe(digest);
     expect(statSync(join(f.destination, "src/local.rs")).mtimeMs).toBe(modifiedAt);
   });
 }
