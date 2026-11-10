@@ -77,7 +77,13 @@ object CharacterWidgets {
         val background = color("background", "#171321")
         val foreground = color("foreground", "#f5f0ff")
         val accent = color("accent", "#bca6ff")
+        // Resource shapes keep their radius in dp at the host's actual size.
+        // No background bitmaps enter the shared responsive RemoteViews budget.
+        views.setImageViewResource(R.id.widget_background, R.drawable.widget_background_radii)
+        views.setInt(R.id.widget_background, "setImageLevel", WidgetAppearance.cornerRadiusDp(context))
         views.setInt(R.id.widget_background, "setColorFilter", background)
+        views.setInt(R.id.widget_background, "setImageAlpha", Color.alpha(
+            WidgetAppearance.tintedBackground(background, WidgetAppearance.opacityPct(context))))
         views.setTextViewText(R.id.widget_title, context.getString(if (favorites) R.string.widget_favorites else R.string.widget_recent))
         views.setTextColor(R.id.widget_title, foreground)
         views.setImageViewResource(R.id.widget_symbol, if (favorites) R.drawable.widget_ic_favorite else R.drawable.widget_ic_recent)
@@ -103,6 +109,8 @@ object CharacterWidgets {
                 val item = items.getOrNull(row * columns + column)
                 if (item == null) cell.setViewVisibility(R.id.widget_card, View.INVISIBLE)
                 else {
+                    // Portraits stay on the opaque palette color: RGB_565 has no
+                    // alpha channel, and opacity applies only to the widget background.
                     val bitmap = bitmaps.getOrPut(item.characterId) { portrait(context, item, background, accent) }
                     cell.setImageViewBitmap(R.id.widget_portrait, bitmap)
                     cell.setTextViewText(R.id.widget_name, item.name)
