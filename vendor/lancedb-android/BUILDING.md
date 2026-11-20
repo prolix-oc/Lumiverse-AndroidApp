@@ -6,7 +6,7 @@ has a separate Bionic addon built by `build:lancedb:android-native`.
 
 ## Build on a host
 
-Install Bun 1.4.4, Rust 1.97.0 with LLVM tools and the `aarch64-unknown-linux-gnu` target,
+Install Bun 1.4.5, Rust 1.97.0 with LLVM tools and the `aarch64-unknown-linux-gnu` target,
 Zig 0.16.0, cargo-zigbuild 0.22.3, Git, curl, and tar. Keep the backend
 checkout beside this repository or set `LUMIVERSE_BACKEND_DIR` to its absolute
 path. Its `@lancedb/lancedb` dependency must match the builder's version pin.

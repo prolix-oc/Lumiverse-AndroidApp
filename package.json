@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "license": "SEE LICENSE IN LICENSE.md",
-  "packageManager": "bun@1.4.4",
+  "packageManager": "bun@1.4.5",
   "engines": {
-    "bun": ">=1.4.4"
+    "bun": ">=1.4.5"
   },
   "scripts": {
     "build:android-prototype": "bun run scripts/build-android-prototype.ts",
@@ -33,7 +33,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "2.11.4",
     "@types/jsdom": "28.0.1",
-    "bun-types": "1.4.4",
+    "bun-types": "1.4.5",
     "jsdom": "29.0.1",
     "typescript": "7.0.2",
     "esbuild": "0.28.2"

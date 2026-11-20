@@ -26,6 +26,21 @@ preserves browser storage for extensions. A port conflict reports a startup
 failure rather than silently choosing a new origin. This does not migrate storage
 from older random ports or across explicit remote-hosting port changes.
 
+The bundled loopback frontend uses the APK's files directly. The native startup
+hook retires an older PWA service worker and its Workbox frontend precache so an
+APK upgrade cannot keep loading an obsolete interface. Cookies, local storage,
+extension data and image caches are preserved. Hosted connections retain PWA
+caching. If the application root stays empty for 30 seconds, a reload screen
+provides recovery; Android Back still opens connection controls.
+
+Verify stale-worker recovery and the blank-startup screen on an installed test APK:
+
+```sh
+bun scripts/smoke-test-android-frontend-startup.ts --serial emulator-5554
+```
+
+Use `--baseline` with an older APK to reproduce the retained-worker blank screen.
+
 Run the real-client background regression on an explicitly selected disposable
 emulator with a test APK installed:
 
@@ -69,7 +84,7 @@ require the Android 17 `ACCESS_LOCAL_NETWORK` runtime permission.
 
 ## Setup and build
 
-Use Bun 1.4.4, Node.js, Rust/rustup, Android Studio's JDK, Android SDK platform 36
+Use Bun 1.4.5, Node.js, Rust/rustup, Android Studio's JDK, Android SDK platform 36
 or newer, build tools, and NDK r28c. Native LanceDB builds use Rust 1.97.0.
 Configure `ANDROID_HOME`, `JAVA_HOME`, and `ANDROID_NDK_HOME`/`NDK_HOME` when they
 are installed outside the build scripts' defaults.
